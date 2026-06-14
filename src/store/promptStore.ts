@@ -52,6 +52,7 @@ interface PromptActions {
   ratePrompt: (id: number, data: RatePromptRequest) => Promise<ApiResponse<{ rating: number; ratingCount: number }>>;
   setFilters: (filters: Partial<PromptFilters>) => void;
   clearCurrentPrompt: () => void;
+  updateCurrentPrompt: (updates: Partial<Prompt>) => void;
 }
 
 type PromptStore = PromptState & PromptActions;
@@ -359,6 +360,12 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
 
   clearCurrentPrompt: () => {
     set({ currentPrompt: null });
+  },
+
+  updateCurrentPrompt: (updates: Partial<Prompt>) => {
+    set((state) => ({
+      currentPrompt: state.currentPrompt ? { ...state.currentPrompt, ...updates } : state.currentPrompt,
+    }));
   },
 }));
 

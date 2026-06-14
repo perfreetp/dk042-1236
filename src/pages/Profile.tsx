@@ -110,8 +110,9 @@ export default function Profile() {
           break;
         }
         case 'favorites': {
+          if (!isOwnProfile) break;
           const res = await apiClient.get<Favorite[]>(
-            `/favorites?userId=${profile.id}`
+            `/favorites`
           );
           if (res.success && res.data) {
             setFavorites(res.data);
@@ -151,10 +152,14 @@ export default function Profile() {
 
   useEffect(() => {
     if (profile) {
-      loadTabContent(activeTab);
+      if (activeTab === 'favorites' && !isOwnProfile) {
+        setActiveTab('prompts');
+      } else {
+        loadTabContent(activeTab);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, profile]);
+  }, [activeTab, profile, isOwnProfile]);
 
   const handleFollow = async () => {
     if (!profile || !isAuthenticated) {
@@ -210,8 +215,8 @@ export default function Profile() {
   };
 
   const tabs = [
-    { id: 'prompts' as TabType, label: '发布的提示词', icon: FileText, count: prompts.length },
-    { id: 'favorites' as TabType, label: '收藏', icon: Heart, count: favorites.length },
+    { id: 'prompts' as TabType, label: '发布的提示词', icon: FileText, count: profile?.promptCount || 0 },
+    ...(isOwnProfile ? [{ id: 'favorites' as TabType, label: '收藏', icon: Heart, count: profile?.favoriteCount || 0 }] : []),
     { id: 'following' as TabType, label: '关注', icon: UserPlus, count: profile?.followingCount || 0 },
     { id: 'followers' as TabType, label: '粉丝', icon: Users, count: profile?.followerCount || 0 },
   ];
@@ -285,7 +290,7 @@ export default function Profile() {
               <div className="flex items-center gap-8 mt-4">
                 <div className="text-center">
                   <p className="font-display text-2xl font-bold text-ink-900">
-                    {formatNumber(prompts.length)}
+                    {formatNumber(profile.promptCount)}
                   </p>
                   <p className="text-sm text-ink-500">提示词</p>
                 </div>

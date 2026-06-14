@@ -8,6 +8,8 @@ export interface User {
   createdAt: string;
   followerCount: number;
   followingCount: number;
+  promptCount: number;
+  favoriteCount: number;
 }
 
 export interface Tag {

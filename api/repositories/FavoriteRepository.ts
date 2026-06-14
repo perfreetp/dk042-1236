@@ -67,6 +67,12 @@ export const FavoriteRepository = {
     return row ? mapFavoriteRow(row) : null
   },
 
+  async checkFavorite(userId: number, promptId: number): Promise<boolean> {
+    const sql = 'SELECT 1 FROM favorites WHERE user_id = ? AND prompt_id = ?'
+    const row = db.getOne<{ '1': number }>(sql, [userId, promptId])
+    return !!row
+  },
+
   async add(userId: number, promptId: number, groupId?: number | null): Promise<Favorite> {
     const params: any[] = [userId, promptId]
     let columns = 'user_id, prompt_id'

@@ -28,6 +28,7 @@ import 'prismjs/themes/prism-tomorrow.css';
 import { cn } from '@/lib/utils';
 import { usePromptStore } from '@/store/promptStore';
 import { useAuthStore } from '@/store/authStore';
+import { useFavoriteStore } from '@/store/favoriteStore';
 import { useToast } from '@/hooks/useToast';
 import { useCopy } from '@/hooks/useCopy';
 import RatingStars from '@/components/RatingStars';
@@ -60,11 +61,11 @@ export default function PromptDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isCopied, copy } = useCopy();
-  const { currentPrompt, loading, fetchById, copyPrompt, forkPrompt, ratePrompt, clearCurrentPrompt } =
+  const { currentPrompt, loading, fetchById, copyPrompt, forkPrompt, ratePrompt, clearCurrentPrompt, updateCurrentPrompt } =
     usePromptStore();
   const { user, isAuthenticated } = useAuthStore();
+  const favoriteStore = useFavoriteStore();
 
-  const [isFavorited, setIsFavorited] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
@@ -85,6 +86,8 @@ export default function PromptDetail() {
 
   const promptId = idParam ? parseInt(idParam, 10) : 0;
 
+  const isFavorited = useFavoriteStore((s) => s.favoritePromptIds.has(promptId));
+
   useEffect(() => {
     if (promptId) {
       fetchById(promptId);
@@ -95,6 +98,16 @@ export default function PromptDetail() {
       clearCurrentPrompt();
     };
   }, [promptId, fetchById, clearCurrentPrompt]);
+
+  useEffect(() => {
+    if (isAuthenticated && currentPrompt && currentPrompt.authorId && user && currentPrompt.authorId !== user.id) {
+      apiClient.get<{ isFollowing: boolean }>(`/follow/check/${currentPrompt.authorId}`).then((res) => {
+        if (res.success && res.data) {
+          setIsFollowing(res.data.isFollowing);
+        }
+      });
+    }
+  }, [isAuthenticated, currentPrompt, user]);
 
   useEffect(() => {
     if (currentPrompt && !viewIncremented) {
@@ -195,19 +208,9 @@ export default function PromptDetail() {
       navigate('/login');
       return;
     }
-    try {
-      if (isFavorited) {
-        await apiClient.delete(`/favorites/${promptId}`);
-        setIsFavorited(false);
-        toast.info('已取消收藏');
-      } else {
-        await apiClient.post('/favorites', { promptId });
-        setIsFavorited(true);
-        toast.success('已添加到收藏');
-      }
-    } catch (error) {
-      toast.error('操作失败');
-    }
+    const wasFavorited = favoriteStore.isFavorited(promptId);
+    await favoriteStore.toggleFavorite(promptId);
+    toast.success(wasFavorited ? '已取消收藏' : '已添加到收藏');
   };
 
   const handleFollow = async () => {
@@ -220,10 +223,26 @@ export default function PromptDetail() {
       if (isFollowing) {
         await apiClient.delete(`/follow/${currentPrompt?.authorId}`);
         setIsFollowing(false);
+        if (currentPrompt?.author) {
+          updateCurrentPrompt({
+            author: {
+              ...currentPrompt.author,
+              followerCount: (currentPrompt.author.followerCount || 0) - 1,
+            },
+          });
+        }
         toast.info('已取消关注');
       } else {
         await apiClient.post('/follow', { userId: currentPrompt?.authorId });
         setIsFollowing(true);
+        if (currentPrompt?.author) {
+          updateCurrentPrompt({
+            author: {
+              ...currentPrompt.author,
+              followerCount: (currentPrompt.author.followerCount || 0) + 1,
+            },
+          });
+        }
         toast.success('已关注作者');
       }
     } catch (error) {

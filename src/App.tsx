@@ -15,6 +15,8 @@ import Header from "@/components/Layout/Header";
 import Footer from "@/components/Layout/Footer";
 import ToastContainer from "@/components/Layout/ToastContainer";
 import { useToast } from "@/hooks/useToast";
+import { useAuthStore } from "@/store/authStore";
+import { useFavoriteStore } from "@/store/favoriteStore";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -69,6 +71,12 @@ function AppRoutes() {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (useAuthStore.getState().isAuthenticated && !useFavoriteStore.getState().initialized) {
+      useFavoriteStore.getState().fetchFavorites();
+    }
+  }, []);
+
   return (
     <Router>
       <Layout>

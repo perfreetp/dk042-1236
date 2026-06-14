@@ -10,11 +10,8 @@ import {
   PenTool,
   Briefcase,
   BookOpen,
-  Music,
   Palette,
-  Bot,
   BarChart3,
-  Languages,
   ChevronRight,
   Flame,
   Star,
@@ -29,15 +26,12 @@ import apiClient from '@/lib/apiClient';
 import type { Prompt, Tag, PaginatedResponse } from '../../shared/types';
 
 const categories = [
-  { id: 'writing', name: '写作', icon: PenTool, color: 'bg-amber-100 text-amber-700' },
-  { id: 'coding', name: '编程', icon: Code2, color: 'bg-ink-100 text-ink-700' },
-  { id: 'business', name: '商业', icon: Briefcase, color: 'bg-moss-500/10 text-moss-600' },
-  { id: 'education', name: '教育', icon: BookOpen, color: 'bg-amber-100 text-amber-700' },
-  { id: 'creative', name: '创意', icon: Palette, color: 'bg-cream-200 text-ink-700' },
-  { id: 'music', name: '音乐', icon: Music, color: 'bg-amber-100 text-amber-700' },
-  { id: 'chatbot', name: '对话', icon: Bot, color: 'bg-ink-100 text-ink-700' },
-  { id: 'analytics', name: '分析', icon: BarChart3, color: 'bg-moss-500/10 text-moss-600' },
-  { id: 'translation', name: '翻译', icon: Languages, color: 'bg-cream-200 text-ink-700' },
+  { id: '内容创作', name: '写作', icon: PenTool, color: 'bg-amber-100 text-amber-700' },
+  { id: '代码开发', name: '编程', icon: Code2, color: 'bg-ink-100 text-ink-700' },
+  { id: '营销文案', name: '商业', icon: Briefcase, color: 'bg-moss-500/10 text-moss-600' },
+  { id: '教育学习', name: '教育', icon: BookOpen, color: 'bg-amber-100 text-amber-700' },
+  { id: '设计创意', name: '创意', icon: Palette, color: 'bg-cream-200 text-ink-700' },
+  { id: '数据分析', name: '分析', icon: BarChart3, color: 'bg-moss-500/10 text-moss-600' },
 ];
 
 const searchSuggestions = [
@@ -124,8 +118,7 @@ export default function Home() {
     }
   };
 
-  const handleFavorite = (promptId: number) => {
-    toast.info('已添加到收藏');
+  const handleFavorite = (_promptId: number) => {
   };
 
   const setSectionRef = (id: string) => (el: HTMLElement | null) => {
@@ -262,7 +255,7 @@ export default function Home() {
               return (
                 <Link
                   key={category.id}
-                  to={`/categories?purpose=${category.id}`}
+                  to={`/categories?purpose=${encodeURIComponent(category.id)}`}
                   className="flex flex-col items-center gap-3 p-4 bg-cream-50 rounded-xl border border-ink-100 hover:border-amber-300 hover:shadow-card-hover transition-all duration-300 group"
                 >
                   <div

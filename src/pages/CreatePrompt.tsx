@@ -83,6 +83,12 @@ export default function CreatePrompt() {
   const [editId, setEditId] = useState<number | null>(null);
   const [forkId, setForkId] = useState<number | null>(null);
 
+  const getDraftKey = () => {
+    if (editId) return `prompt-edit-draft-${editId}`;
+    if (forkId) return `prompt-fork-draft-${forkId}`;
+    return DRAFT_STORAGE_KEY;
+  };
+
   const loadTags = async () => {
     try {
       const res = await apiClient.get<Tag[]>('/tags');
@@ -126,13 +132,14 @@ export default function CreatePrompt() {
   };
 
   const checkDraft = useCallback(() => {
-    const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
+    const draftKey = editId ? `prompt-edit-draft-${editId}` : forkId ? `prompt-fork-draft-${forkId}` : DRAFT_STORAGE_KEY;
+    const draft = localStorage.getItem(draftKey);
     setHasDraft(!!draft);
-  }, []);
+  }, [editId, forkId]);
 
   const loadDraft = () => {
     try {
-      const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
+      const draft = localStorage.getItem(getDraftKey());
       if (draft) {
         const parsed = JSON.parse(draft);
         setFormData(parsed);
@@ -147,7 +154,7 @@ export default function CreatePrompt() {
   const saveDraft = useCallback(async () => {
     setIsSavingDraft(true);
     try {
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(formData));
+      localStorage.setItem(getDraftKey(), JSON.stringify(formData));
       toast.success('草稿已保存');
       checkDraft();
     } catch {
@@ -155,11 +162,10 @@ export default function CreatePrompt() {
     } finally {
       setIsSavingDraft(false);
     }
-  }, [formData, checkDraft, toast]);
+  }, [formData, checkDraft, getDraftKey, toast]);
 
   useEffect(() => {
     loadTags();
-    checkDraft();
 
     const editParam = searchParams.get('edit') || params.promptId;
     const forkParam = searchParams.get('fork');
@@ -176,22 +182,35 @@ export default function CreatePrompt() {
       setEditId(null);
       setForkId(null);
       setFormData(initialFormData);
-      localStorage.removeItem(DRAFT_STORAGE_KEY);
-      checkDraft();
+      const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed.title || parsed.content) {
+            setHasDraft(true);
+          }
+        } catch {
+          setHasDraft(false);
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, params.promptId]);
 
   useEffect(() => {
+    checkDraft();
+  }, [checkDraft]);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       if (formData.title || formData.content) {
-        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(formData));
+        localStorage.setItem(getDraftKey(), JSON.stringify(formData));
         checkDraft();
       }
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [formData, checkDraft]);
+  }, [formData, checkDraft, getDraftKey]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
@@ -272,7 +291,7 @@ export default function CreatePrompt() {
       }
 
       if (response.success && response.data) {
-        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        localStorage.removeItem(getDraftKey());
         toast.success(successMessage);
         navigate('/my-prompts?status=pending');
       } else {

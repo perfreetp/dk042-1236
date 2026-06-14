@@ -48,6 +48,37 @@ export const FavoriteController = {
     }
   },
 
+  async checkFavorite(
+    req: AuthRequest,
+    res: Response<ApiResponse<{ isFavorited: boolean }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: '未授权访问'
+        })
+        return
+      }
+      const promptId = parseInt(req.params.promptId)
+      if (isNaN(promptId)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的提示词 ID'
+        })
+        return
+      }
+      const isFavorited = await FavoriteRepository.checkFavorite(req.user.id, promptId)
+      res.json({
+        success: true,
+        data: { isFavorited }
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
   async addFavorite(
     req: AuthRequest,
     res: Response<ApiResponse<{ favorited: boolean }>>,

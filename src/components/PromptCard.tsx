@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Heart, Copy, TrendingUp, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TagBadge from './TagBadge';
 import RatingStars from './RatingStars';
+import { useFavoriteStore } from '@/store/favoriteStore';
+import { useAuthStore } from '@/store/authStore';
+import { useToast } from '@/hooks/useToast';
 import type { Prompt } from '../../shared/types';
 
 interface PromptCardProps {
@@ -22,7 +25,7 @@ const difficultyConfig = {
 
 export default function PromptCard({
   prompt,
-  isFavorited = false,
+  isFavorited,
   onFavorite,
   onCopy,
   className,
@@ -30,6 +33,14 @@ export default function PromptCard({
   const [isHovered, setIsHovered] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuthStore();
+  const favoriteStore = useFavoriteStore();
+
+  const isFavoritedFromStore = useFavoriteStore(
+    (s) => s.favoritePromptIds.has(prompt.id)
+  );
+  const computedIsFavorited = isFavorited !== undefined ? isFavorited : isFavoritedFromStore;
 
   const handleAuthorClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -37,12 +48,24 @@ export default function PromptCard({
     navigate(`/profile/${prompt.authorId}`);
   };
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsAnimating(true);
-    onFavorite?.(prompt.id);
+
+    if (!isAuthenticated) {
+      toast.error('请先登录');
+      navigate('/login');
+      setIsAnimating(false);
+      return;
+    }
+
+    const wasFavorited = favoriteStore.isFavorited(prompt.id);
+    await favoriteStore.toggleFavorite(prompt.id);
+    toast.success(wasFavorited ? '已取消收藏' : '已添加到收藏');
+
     setTimeout(() => setIsAnimating(false), 500);
+    onFavorite?.(prompt.id);
   };
 
   const handleCopyClick = (e: React.MouseEvent) => {
@@ -137,7 +160,7 @@ export default function PromptCard({
               onClick={handleFavoriteClick}
               className={cn(
                 'flex items-center gap-1 transition-colors',
-                isFavorited
+                computedIsFavorited
                   ? 'text-vermilion-500'
                   : 'text-ink-500 hover:text-vermilion-500',
                 isAnimating && 'animate-bounce-subtle'
@@ -145,10 +168,10 @@ export default function PromptCard({
               title="收藏"
             >
               <Heart
-                className={cn('w-4 h-4', isFavorited && 'fill-vermilion-500')}
+                className={cn('w-4 h-4', computedIsFavorited && 'fill-vermilion-500')}
               />
               <span className="text-xs">
-                {prompt.favoriteCount + (isFavorited ? 1 : 0)}
+                {prompt.favoriteCount + (computedIsFavorited ? 1 : 0)}
               </span>
             </button>
 

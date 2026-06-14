@@ -197,8 +197,7 @@ export default function Search() {
     }
   };
 
-  const handleFavorite = (promptId: number) => {
-    toast.info('已添加到收藏');
+  const handleFavorite = (_promptId: number) => {
   };
 
   const highlightText = (text: string, query: string) => {

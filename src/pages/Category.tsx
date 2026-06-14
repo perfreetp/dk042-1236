@@ -32,7 +32,7 @@ export default function Category() {
 
   const sortBy = searchParams.get('sort') || 'createdAt';
   const currentPage = Number(searchParams.get('page')) || 1;
-  const purpose = searchParams.get('purpose') || undefined;
+  const purpose = searchParams.get('purpose') ? decodeURIComponent(searchParams.get('purpose')!) : undefined;
   const model = searchParams.get('model') || undefined;
   const language = searchParams.get('language') || undefined;
   const difficulty = searchParams.get('difficulty') || undefined;
@@ -113,8 +113,7 @@ export default function Category() {
     }
   };
 
-  const handleFavorite = (promptId: number) => {
-    toast.info('已添加到收藏');
+  const handleFavorite = (_promptId: number) => {
   };
 
   const activeFilterCount =
@@ -129,10 +128,10 @@ export default function Category() {
       <div className="container">
         <div className="mb-8 animate-fade-in-up">
           <h1 className="font-display text-3xl md:text-4xl font-bold text-ink-900 mb-2">
-            浏览提示词
+            {purpose ? `浏览：${purpose} 提示词` : '浏览提示词'}
           </h1>
           <p className="text-ink-500 text-lg">
-            按分类和标签筛选，找到最适合你的提示词
+            {purpose ? `探索${purpose}领域的优质提示词` : '按分类和标签筛选，找到最适合你的提示词'}
           </p>
         </div>
 

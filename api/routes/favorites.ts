@@ -5,6 +5,7 @@ import authMiddleware from '../middleware/auth'
 const router = Router()
 
 router.get('/', authMiddleware, FavoriteController.getFavorites)
+router.get('/check/:promptId', authMiddleware, FavoriteController.checkFavorite)
 router.post('/', authMiddleware, FavoriteController.addFavorite)
 router.delete('/:id', authMiddleware, FavoriteController.removeFavorite)
 router.put('/:id', authMiddleware, FavoriteController.updateFavoriteGroup)

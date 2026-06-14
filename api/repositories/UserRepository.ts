@@ -12,11 +12,11 @@ interface UserRow {
   created_at: string
 }
 
-export interface UserWithPassword extends Omit<User, 'followerCount' | 'followingCount'> {
+export interface UserWithPassword extends Omit<User, 'followerCount' | 'followingCount' | 'promptCount' | 'favoriteCount'> {
   passwordHash: string
 }
 
-function mapUserRow(row: UserRow & { follower_count?: number; following_count?: number }): User {
+function mapUserRow(row: UserRow & { follower_count?: number; following_count?: number; prompt_count?: number; favorite_count?: number }): User {
   return {
     id: row.id,
     email: row.email,
@@ -26,7 +26,9 @@ function mapUserRow(row: UserRow & { follower_count?: number; following_count?: 
     role: row.role as 'user' | 'author' | 'admin',
     createdAt: row.created_at,
     followerCount: row.follower_count || 0,
-    followingCount: row.following_count || 0
+    followingCount: row.following_count || 0,
+    promptCount: row.prompt_count || 0,
+    favoriteCount: row.favorite_count || 0
   }
 }
 
@@ -56,11 +58,13 @@ export const UserRepository = {
     const sql = `
       SELECT u.*,
         (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as follower_count,
-        (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) as following_count
+        (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) as following_count,
+        (SELECT COUNT(*) FROM prompts WHERE author_id = u.id AND status = 'approved') as prompt_count,
+        (SELECT COUNT(*) FROM favorites WHERE user_id = u.id) as favorite_count
       FROM users u
       WHERE u.id = ?
     `
-    const row = db.getOne<UserRow & { follower_count: number; following_count: number }>(sql, [id])
+    const row = db.getOne<UserRow & { follower_count: number; following_count: number; prompt_count: number; favorite_count: number }>(sql, [id])
     return row ? mapUserRow(row) : null
   },
 
