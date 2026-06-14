@@ -50,6 +50,7 @@ export default function Category() {
       sort: mapSortParam(sortBy),
       page: currentPage,
       pageSize: 12,
+      tags: selectedTags.length > 0 ? selectedTags : undefined,
     };
     setFilters(filters);
     fetchPrompts(filters);

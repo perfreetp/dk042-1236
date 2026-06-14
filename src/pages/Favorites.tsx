@@ -21,6 +21,7 @@ import Modal from '@/components/Modal';
 import type {
   Favorite,
   FavoriteGroup,
+  PaginatedResponse,
 } from '../../shared/types';
 
 export default function Favorites() {
@@ -44,7 +45,7 @@ export default function Favorites() {
     try {
       const [groupsRes, favsRes] = await Promise.all([
         apiClient.get<FavoriteGroup[]>(`/favorites/groups`),
-        apiClient.get<Favorite[]>(
+        apiClient.get<PaginatedResponse<Favorite>>(
           selectedGroupId
             ? `/favorites?groupId=${selectedGroupId}`
             : '/favorites'
@@ -52,10 +53,10 @@ export default function Favorites() {
       ]);
 
       if (groupsRes.success && groupsRes.data) {
-        setGroups(groupsRes.data);
+        setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
       }
       if (favsRes.success && favsRes.data) {
-        setFavorites(favsRes.data);
+        setFavorites(favsRes.data.items || []);
       }
     } catch {
       toast.error('加载收藏失败，请稍后重试');
@@ -129,12 +130,15 @@ export default function Favorites() {
   const handleRemoveSelected = async () => {
     if (selectedIds.size === 0) return;
     try {
+      const selectedItems = favorites.filter((f) => selectedIds.has(f.id));
+      const selectedPromptIds = selectedItems.map((f) => f.promptId);
       await Promise.all(
-        Array.from(selectedIds).map((id) =>
-          apiClient.delete(`/favorites/${id}`)
+        selectedPromptIds.map((promptId) =>
+          apiClient.delete(`/favorites/${promptId}`)
         )
       );
-      setFavorites(favorites.filter((f) => !selectedIds.has(f.id)));
+      const promptIdSet = new Set(selectedPromptIds);
+      setFavorites(favorites.filter((f) => !promptIdSet.has(f.promptId)));
       setSelectedIds(new Set());
       setIsSelectMode(false);
       toast.success(`已移除 ${selectedIds.size} 个收藏`);
@@ -161,13 +165,13 @@ export default function Favorites() {
     }
   };
 
-  const handleRemoveFavorite = async (favoriteId: number, e: React.MouseEvent) => {
+  const handleRemoveFavorite = async (fav: Favorite, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     try {
-      const response = await apiClient.delete(`/favorites/${favoriteId}`);
+      const response = await apiClient.delete(`/favorites/${fav.promptId}`);
       if (response.success) {
-        setFavorites(favorites.filter((f) => f.id !== favoriteId));
+        setFavorites(favorites.filter((f) => f.promptId !== fav.promptId));
         toast.success('已取消收藏');
       }
     } catch {
@@ -438,7 +442,7 @@ export default function Favorites() {
 
                     {!isSelectMode && (
                       <button
-                        onClick={(e) => handleRemoveFavorite(fav.id, e)}
+                        onClick={(e) => handleRemoveFavorite(fav, e)}
                         className="absolute top-3 right-3 z-10 p-2 bg-cream-50 text-vermilion-500 rounded-md shadow-card opacity-0 group-hover:opacity-100 transition-opacity hover:bg-vermilion-50"
                         title="取消收藏"
                       >

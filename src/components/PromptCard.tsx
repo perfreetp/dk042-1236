@@ -49,7 +49,7 @@ export default function PromptCard({
 
   return (
     <Link
-      to={`/prompts/${prompt.id}`}
+      to={`/prompt/${prompt.id}`}
       className={cn(
         'group relative bg-cream-50 rounded-xl border border-ink-100 shadow-card overflow-hidden transition-all duration-300 hover:shadow-card-hover',
         isHovered && 'translate-y-[-2px] rotate-[0.5deg]',

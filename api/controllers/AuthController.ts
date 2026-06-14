@@ -15,6 +15,12 @@ const loginSchema = z.object({
   password: z.string().min(1, '密码不能为空')
 })
 
+const updateProfileSchema = z.object({
+  username: z.string().min(2, '用户名至少 2 个字符').max(50, '用户名最多 50 个字符').optional(),
+  avatar: z.string().optional(),
+  bio: z.string().max(500, '简介最多 500 个字符').optional()
+})
+
 export const AuthController = {
   async register(
     req: AuthRequest,
@@ -69,6 +75,31 @@ export const AuthController = {
       res.json({
         success: true,
         data: user
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async updateProfile(
+    req: AuthRequest,
+    res: Response<ApiResponse<User>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: '未授权访问'
+        })
+        return
+      }
+      const data = updateProfileSchema.parse(req.body)
+      const user = await AuthService.updateProfile(req.user.id, data)
+      res.json({
+        success: true,
+        data: user,
+        message: '资料更新成功'
       })
     } catch (error) {
       next(error)

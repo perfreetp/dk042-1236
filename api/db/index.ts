@@ -159,11 +159,12 @@ class DatabaseService {
 
   runQuery(sql: string, params: any[] = []): any {
     const database = this.getDb();
-    const stmt = database.prepare(sql);
-    const result = stmt.runAsObject(params);
-    stmt.free();
+    database.run(sql, params);
+    const lastIdResult = database.exec('SELECT last_insert_rowid() as id');
+    const lastInsertRowid = lastIdResult[0]?.values[0]?.[0] || 0;
+    const changes = database.getRowsModified();
     this.saveDatabase();
-    return result;
+    return { lastInsertRowid, changes };
   }
 
   getOne<T>(sql: string, params: any[] = []): T | null {

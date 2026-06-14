@@ -102,12 +102,20 @@ export const useAuthStore = create<AuthStore>()(
             });
           } else {
             set({
+              user: null,
+              token: null,
+              isAuthenticated: false,
               isLoading: false,
             });
           }
           return response;
         } catch (error) {
-          set({ isLoading: false });
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
           return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to fetch profile',
@@ -129,11 +137,20 @@ export const useAuthStore = create<AuthStore>()(
       partialize: (state) => ({ token: state.token }),
       onRehydrateStorage: () => (state) => {
         if (state?.token) {
+          state.isAuthenticated = true;
           state.fetchProfile();
         }
       },
     }
   )
 );
+
+useAuthStore.subscribe((state) => {
+  if (state.token) {
+    localStorage.setItem('authToken', state.token);
+  } else {
+    localStorage.removeItem('authToken');
+  }
+});
 
 export default useAuthStore;

@@ -423,7 +423,7 @@ export default function Home() {
                   {trendingPrompts.map((prompt, index) => (
                     <Link
                       key={prompt.id}
-                      to={`/prompts/${prompt.id}`}
+                      to={`/prompt/${prompt.id}`}
                       className="group flex items-center gap-4 p-4 bg-cream-100 rounded-xl border border-ink-100 hover:border-amber-300 hover:shadow-card-hover transition-all duration-300"
                     >
                       <div

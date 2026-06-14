@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import UserRepository from '../repositories/UserRepository'
 import type { User } from '../../shared/types'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'promptshare-secret-key'
@@ -30,19 +31,23 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
 
-    req.user = {
-      id: decoded.userId,
-      email: decoded.email,
-      role: decoded.role as 'user' | 'author' | 'admin',
-      username: '',
-      avatar: '',
-      bio: '',
-      createdAt: '',
-      followerCount: 0,
-      followingCount: 0
-    }
+    UserRepository.findById(decoded.userId).then(user => {
+      if (!user) {
+        res.status(401).json({
+          success: false,
+          error: '用户不存在，请重新登录'
+        })
+        return
+      }
 
-    next()
+      req.user = user
+      next()
+    }).catch(() => {
+      res.status(401).json({
+        success: false,
+        error: '无效的令牌，请重新登录'
+      })
+    })
   } catch (error) {
     res.status(401).json({
       success: false,

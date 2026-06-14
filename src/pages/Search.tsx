@@ -100,6 +100,7 @@ export default function Search() {
       sort: sortBy === 'latest' ? 'createdAt' : sortBy === 'rating' ? 'rating' : sortBy === 'favorites' ? 'favoriteCount' : 'copyCount',
       page: currentPage,
       pageSize: 12,
+      tags: selectedTags.length > 0 ? selectedTags : undefined,
     };
     setFilters(filters);
     await fetchPrompts(filters);

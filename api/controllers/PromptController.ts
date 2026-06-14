@@ -34,6 +34,7 @@ const querySchema = z.object({
   difficulty: z.string().optional(),
   search: z.string().optional(),
   status: z.string().default('approved'),
+  isFeatured: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
   sortBy: z.enum(['createdAt', 'rating', 'copyCount', 'favoriteCount']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc')
 })
@@ -53,7 +54,8 @@ export const PromptController = {
           language: query.language,
           difficulty: query.difficulty,
           search: query.search,
-          status: query.status
+          status: query.status,
+          isFeatured: query.isFeatured
         },
         { field: query.sortBy, order: query.sortOrder },
         query.page,
@@ -287,6 +289,29 @@ export const PromptController = {
       res.json({
         success: true,
         data: versions
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async viewPrompt(
+    req: AuthRequest,
+    res: Response<ApiResponse<null>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const id = parseInt(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的提示词 ID'
+        })
+        return
+      }
+      await PromptService.incrementViewCount(id)
+      res.json({
+        success: true
       })
     } catch (error) {
       next(error)

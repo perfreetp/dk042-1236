@@ -80,6 +80,10 @@ export const PromptService = {
     return PromptRepository.incrementCopyCount(promptId)
   },
 
+  async incrementViewCount(promptId: number): Promise<boolean> {
+    return PromptRepository.incrementViewCount(promptId)
+  },
+
   async forkPrompt(promptId: number, userId: number): Promise<Prompt> {
     const originalPrompt = await PromptRepository.findById(promptId)
     if (!originalPrompt) {

@@ -116,6 +116,7 @@ export interface PromptFilters {
   search?: string
   status?: string
   authorId?: number
+  isFeatured?: boolean
 }
 
 export interface PromptSort {
@@ -161,6 +162,10 @@ export const PromptRepository = {
     if (filters.authorId) {
       whereClauses.push('p.author_id = ?')
       params.push(filters.authorId)
+    }
+    if (filters.isFeatured !== undefined) {
+      whereClauses.push('p.is_featured = ?')
+      params.push(filters.isFeatured ? 1 : 0)
     }
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
@@ -365,6 +370,11 @@ export const PromptRepository = {
 
   async incrementForkCount(id: number): Promise<boolean> {
     const result = db.runQuery('UPDATE prompts SET fork_count = fork_count + 1 WHERE id = ?', [id])
+    return (result.changes as number) > 0
+  },
+
+  async incrementViewCount(id: number): Promise<boolean> {
+    const result = db.runQuery('UPDATE prompts SET view_count = view_count + 1 WHERE id = ?', [id])
     return (result.changes as number) > 0
   },
 

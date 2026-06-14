@@ -178,7 +178,7 @@ export default function PromptDetail() {
       const response = await forkPrompt(promptId);
       if (response.success && response.data) {
         toast.success('派生成功，已创建副本');
-        navigate(`/prompts/${response.data.id}/edit`);
+        navigate(`/edit/${response.data.id}`);
       } else {
         toast.error(response.error || '派生失败');
       }
@@ -480,7 +480,7 @@ export default function PromptDetail() {
 
               <div className="flex flex-wrap items-center gap-6 mb-6">
                 <Link
-                  to={`/users/${currentPrompt.authorId}`}
+                  to={`/profile/${currentPrompt.authorId}`}
                   className="flex items-center gap-3 group"
                 >
                   <img
@@ -885,7 +885,7 @@ export default function PromptDetail() {
                   关于作者
                 </h3>
                 <Link
-                  to={`/users/${currentPrompt.authorId}`}
+                  to={`/profile/${currentPrompt.authorId}`}
                   className="flex items-center gap-3 mb-4"
                 >
                   <img

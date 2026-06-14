@@ -59,6 +59,7 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/category/:category" element={<Category />} />
+        <Route path="/categories" element={<Category />} />
         <Route path="/prompt/:promptId" element={<PromptDetail />} />
         <Route path="/search" element={<Search />} />
       </Routes>

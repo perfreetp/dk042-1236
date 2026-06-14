@@ -6,6 +6,8 @@ CREATE TABLE users (
     avatar VARCHAR(500),
     bio TEXT,
     role VARCHAR(20) DEFAULT 'user',
+    follower_count INTEGER DEFAULT 0,
+    following_count INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -51,7 +53,8 @@ CREATE TABLE tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(50) UNIQUE NOT NULL,
     category VARCHAR(50) NOT NULL,
-    color VARCHAR(20) DEFAULT '#F59E0B'
+    color VARCHAR(20) DEFAULT '#F59E0B',
+    prompt_count INTEGER DEFAULT 0
 );
 
 CREATE TABLE prompt_tags (

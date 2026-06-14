@@ -14,6 +14,15 @@ class ApiClient {
   }
 
   private getAuthToken(): string | null {
+    try {
+      const stored = localStorage.getItem('auth-storage');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed?.state?.token || null;
+      }
+    } catch {
+      // ignore parse errors
+    }
     return localStorage.getItem('authToken');
   }
 

@@ -57,6 +57,14 @@ export const AuthService = {
     return user
   },
 
+  async updateProfile(userId: number, data: Partial<{ username: string; avatar: string; bio: string }>): Promise<User> {
+    const user = await UserRepository.update(userId, data)
+    if (!user) {
+      throw new AppError('用户不存在', 404)
+    }
+    return user
+  },
+
   generateToken(user: User): string {
     return jwt.sign(
       {

@@ -36,6 +36,7 @@ import type {
   Banner,
   HomeConfig,
   ApiResponse,
+  PaginatedResponse,
 } from '../../shared/types';
 
 type AdminTab = 'content' | 'tags' | 'reports' | 'home';
@@ -155,11 +156,11 @@ export default function Admin() {
 
   const loadPendingPrompts = async () => {
     try {
-      const res = await apiClient.get<Prompt[]>(
-        '/admin/prompts?status=pending'
+      const res = await apiClient.get<PaginatedResponse<Prompt>>(
+        '/admin/prompts/pending'
       );
       if (res.success && res.data) {
-        setPendingPrompts(res.data);
+        setPendingPrompts(res.data.items || []);
       }
     } catch {
       toast.error('加载待审核内容失败');
@@ -191,8 +192,8 @@ export default function Admin() {
   const loadHomeConfig = async () => {
     try {
       const [configRes, promptsRes, bannersRes] = await Promise.all([
-        apiClient.get<HomeConfig>('/admin/home/config'),
-        apiClient.get<Prompt[]>('/prompts?pageSize=100'),
+        apiClient.get<HomeConfig>('/admin/home-config'),
+        apiClient.get<PaginatedResponse<Prompt>>('/prompts?pageSize=100'),
         apiClient.get<Banner[]>('/admin/banners'),
       ]);
 
@@ -200,10 +201,10 @@ export default function Admin() {
         setHomeConfig(configRes.data);
       }
       if (promptsRes.success && promptsRes.data) {
-        setAllPrompts(promptsRes.data);
+        setAllPrompts(promptsRes.data.items || []);
       }
       if (bannersRes.success && bannersRes.data) {
-        setBanners(bannersRes.data);
+        setBanners(Array.isArray(bannersRes.data) ? bannersRes.data : []);
       }
     } catch {
       toast.error('加载首页配置失败');
@@ -608,7 +609,7 @@ export default function Admin() {
 
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => navigate(`/prompts/${prompt.id}`)}
+                              onClick={() => navigate(`/prompt/${prompt.id}`)}
                               className="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
                               title="查看详情"
                             >
@@ -769,7 +770,7 @@ export default function Admin() {
                             {report.status === 'pending' && (
                               <div className="flex items-center gap-2">
                                 <button
-                                  onClick={() => navigate(`/prompts/${report.promptId}`)}
+                                  onClick={() => navigate(`/prompt/${report.promptId}`)}
                                   className="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
                                   title="查看内容"
                                 >

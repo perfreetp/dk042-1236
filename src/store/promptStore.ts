@@ -17,6 +17,7 @@ interface PromptFilters {
   sort?: string;
   page?: number;
   pageSize?: number;
+  tags?: number[];
 }
 
 interface PaginationState {
@@ -86,6 +87,7 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
       if (currentFilters.sort) params.sort = currentFilters.sort;
       if (currentFilters.page) params.page = currentFilters.page;
       if (currentFilters.pageSize) params.pageSize = currentFilters.pageSize;
+      if (currentFilters.tags?.length) params.tags = currentFilters.tags.join(',');
 
       const response = await apiClient.get<PaginatedResponse<Prompt>>('/prompts', params);
 
@@ -117,7 +119,7 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
   fetchFeatured: async () => {
     set({ loading: true });
     try {
-      const response = await apiClient.get<Prompt[]>('/prompts', {
+      const response = await apiClient.get<PaginatedResponse<Prompt>>('/prompts', {
         isFeatured: true,
         sort: 'createdAt',
         pageSize: 10,
@@ -125,14 +127,14 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
 
       if (response.success && response.data) {
         set({
-          featuredPrompts: Array.isArray(response.data) ? response.data : [],
+          featuredPrompts: response.data.items || [],
           loading: false,
         });
       } else {
         set({ loading: false });
       }
 
-      return response as ApiResponse<Prompt[]>;
+      return { success: true, data: response.data?.items || [] } as ApiResponse<Prompt[]>;
     } catch (error) {
       set({ loading: false });
       return {
@@ -251,6 +253,9 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
           prompts: state.prompts.map((p) =>
             p.id === id ? { ...p, copyCount: response.data!.copyCount } : p
           ),
+          featuredPrompts: state.featuredPrompts.map((p) =>
+            p.id === id ? { ...p, copyCount: response.data!.copyCount } : p
+          ),
           currentPrompt:
             state.currentPrompt?.id === id
               ? { ...state.currentPrompt, copyCount: response.data!.copyCount }
@@ -301,6 +306,15 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
       if (response.success && response.data) {
         set((state) => ({
           prompts: state.prompts.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  rating: response.data!.rating,
+                  ratingCount: response.data!.ratingCount,
+                }
+              : p
+          ),
+          featuredPrompts: state.featuredPrompts.map((p) =>
             p.id === id
               ? {
                   ...p,

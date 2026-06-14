@@ -145,7 +145,7 @@ export default function MyPrompts() {
   };
 
   const handleNewVersion = (prompt: Prompt) => {
-    navigate(`/prompts/new?fork=${prompt.id}`);
+    navigate(`/create?fork=${prompt.id}`);
   };
 
   const engagementData = useMemo(
@@ -404,7 +404,7 @@ export default function MyPrompts() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2">
                         <Link
-                          to={`/prompts/${prompt.id}`}
+                          to={`/prompt/${prompt.id}`}
                           className="font-semibold text-ink-900 hover:text-amber-600 transition-colors truncate"
                         >
                           {prompt.title}
@@ -453,7 +453,7 @@ export default function MyPrompts() {
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => navigate(`/prompts/${prompt.id}`)}
+                        onClick={() => navigate(`/prompt/${prompt.id}`)}
                         className="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
                         title="查看详情"
                       >
@@ -461,7 +461,7 @@ export default function MyPrompts() {
                       </button>
                       <button
                         onClick={() =>
-                          navigate(`/prompts/new?edit=${prompt.id}`)
+                          navigate(`/edit/${prompt.id}`)
                         }
                         className="p-2 text-ink-500 hover:text-amber-600 hover:bg-amber-500/10 rounded-lg transition-colors"
                         title="编辑"

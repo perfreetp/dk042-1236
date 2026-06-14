@@ -19,7 +19,7 @@ export const CommentController = {
     next: NextFunction
   ): Promise<void> {
     try {
-      const promptId = parseInt(req.params.promptId)
+      const promptId = parseInt(req.params.promptId || req.params.id)
       if (isNaN(promptId)) {
         res.status(400).json({
           success: false,
