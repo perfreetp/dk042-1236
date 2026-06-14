@@ -27,6 +27,15 @@ const homeConfigSchema = z.object({
   }).optional()
 })
 
+const createBannerSchema = z.object({
+  title: z.string().min(1, '标题不能为空'),
+  description: z.string().optional().default(''),
+  imageUrl: z.string().min(1, '图片地址不能为空'),
+  linkUrl: z.string().optional().default('')
+})
+
+const updateBannerSchema = createBannerSchema.partial()
+
 const querySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   pageSize: z.coerce.number().min(1).max(100).default(20),
@@ -92,7 +101,8 @@ export const AdminController = {
         })
         return
       }
-      const success = await AdminRepository.rejectPrompt(id)
+      const { reason } = req.body || {}
+      const success = await AdminRepository.rejectPrompt(id, reason)
       if (!success) {
         throw new AppError('提示词不存在', 404)
       }
@@ -257,6 +267,251 @@ export const AdminController = {
         success: true,
         data: config,
         message: '首页配置更新成功'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async getPendingPromptsCount(
+    req: AuthRequest,
+    res: Response<ApiResponse<{ count: number }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const count = await AdminRepository.getPendingPromptsCount()
+      res.json({
+        success: true,
+        data: { count }
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async getReportsCount(
+    req: AuthRequest,
+    res: Response<ApiResponse<{ count: number }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const count = await AdminRepository.getReportsCount()
+      res.json({
+        success: true,
+        data: { count }
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async getUsersCount(
+    req: AuthRequest,
+    res: Response<ApiResponse<{ count: number }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const count = await AdminRepository.getUsersCount()
+      res.json({
+        success: true,
+        data: { count }
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async getPromptsCount(
+    req: AuthRequest,
+    res: Response<ApiResponse<{ count: number }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const count = await AdminRepository.getPromptsCount()
+      res.json({
+        success: true,
+        data: { count }
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async getBanners(
+    req: AuthRequest,
+    res: Response<ApiResponse<Banner[]>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const banners = await AdminRepository.getBanners()
+      res.json({
+        success: true,
+        data: banners
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async createBanner(
+    req: AuthRequest,
+    res: Response<ApiResponse<Banner>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const data = createBannerSchema.parse(req.body) as Omit<Banner, 'id'>
+      const banner = await AdminRepository.createBanner(data)
+      res.status(201).json({
+        success: true,
+        data: banner,
+        message: 'Banner 创建成功'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async updateBanner(
+    req: AuthRequest,
+    res: Response<ApiResponse<Banner>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const id = parseInt(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的 Banner ID'
+        })
+        return
+      }
+      const data = updateBannerSchema.parse(req.body)
+      const banner = await AdminRepository.updateBanner(id, data)
+      if (!banner) {
+        throw new AppError('Banner 不存在', 404)
+      }
+      res.json({
+        success: true,
+        data: banner,
+        message: 'Banner 更新成功'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async deleteBanner(
+    req: AuthRequest,
+    res: Response<ApiResponse<null>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const id = parseInt(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的 Banner ID'
+        })
+        return
+      }
+      const success = await AdminRepository.deleteBanner(id)
+      if (!success) {
+        throw new AppError('Banner 不存在', 404)
+      }
+      res.json({
+        success: true,
+        message: 'Banner 删除成功'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async resolveReport(
+    req: AuthRequest,
+    res: Response<ApiResponse<Report>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const id = parseInt(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的举报 ID'
+        })
+        return
+      }
+      const action = req.params.action
+      const status = action === 'resolve' ? 'resolved' : action === 'reject' ? 'rejected' : null
+      if (!status) {
+        res.status(400).json({
+          success: false,
+          error: '无效的操作'
+        })
+        return
+      }
+      const report = await ReportRepository.updateStatus(id, status)
+      if (!report) {
+        throw new AppError('举报不存在', 404)
+      }
+      res.json({
+        success: true,
+        data: report,
+        message: status === 'resolved' ? '举报已处理' : '举报已驳回'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async removePrompt(
+    req: AuthRequest,
+    res: Response<ApiResponse<null>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const id = parseInt(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的提示词 ID'
+        })
+        return
+      }
+      const success = await AdminRepository.removePrompt(id)
+      if (!success) {
+        throw new AppError('提示词不存在', 404)
+      }
+      res.json({
+        success: true,
+        message: '内容已下架'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async updatePromptAdmin(
+    req: AuthRequest,
+    res: Response<ApiResponse<null>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const id = parseInt(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的提示词 ID'
+        })
+        return
+      }
+      const success = await AdminRepository.updatePromptAdmin(id, req.body)
+      if (!success) {
+        throw new AppError('提示词不存在', 404)
+      }
+      res.json({
+        success: true,
+        message: '提示词更新成功'
       })
     } catch (error) {
       next(error)

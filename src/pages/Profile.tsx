@@ -36,7 +36,7 @@ const roleConfig: Record<UserType['role'], { label: string; color: string }> = {
 };
 
 export default function Profile() {
-  const { id } = useParams<{ id: string }>();
+  const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { user: currentUser, isAuthenticated } = useAuthStore();
   const { toast } = useToast();
@@ -64,13 +64,13 @@ export default function Profile() {
   const loadProfile = async () => {
     setIsLoading(true);
     try {
-      const userId = id ? parseInt(id) : currentUser?.id;
-      if (!userId) {
+      const targetUserId = userId ? parseInt(userId) : currentUser?.id;
+      if (!targetUserId) {
         navigate('/login');
         return;
       }
 
-      const response = await apiClient.get<UserType>(`/users/${userId}`);
+      const response = await apiClient.get<UserType>(`/users/${targetUserId}`);
       if (response.success && response.data) {
         setProfile(response.data);
         setEditForm({
@@ -79,9 +79,9 @@ export default function Profile() {
           avatar: response.data.avatar,
         });
 
-        if (currentUser && currentUser.id !== userId) {
+        if (currentUser && currentUser.id !== targetUserId) {
           const followRes = await apiClient.get<{ isFollowing: boolean }>(
-            `/follow/check/${userId}`
+            `/follow/check/${targetUserId}`
           );
           if (followRes.success && followRes.data) {
             setIsFollowing(followRes.data.isFollowing);
@@ -147,7 +147,7 @@ export default function Profile() {
   useEffect(() => {
     loadProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, currentUser]);
+  }, [userId, currentUser]);
 
   useEffect(() => {
     if (profile) {
@@ -210,8 +210,8 @@ export default function Profile() {
   };
 
   const tabs = [
-    { id: 'prompts' as TabType, label: '发布的提示词', icon: FileText, count: profile?.followerCount || 0 },
-    { id: 'favorites' as TabType, label: '收藏', icon: Heart, count: profile?.followerCount || 0 },
+    { id: 'prompts' as TabType, label: '发布的提示词', icon: FileText, count: prompts.length },
+    { id: 'favorites' as TabType, label: '收藏', icon: Heart, count: favorites.length },
     { id: 'following' as TabType, label: '关注', icon: UserPlus, count: profile?.followingCount || 0 },
     { id: 'followers' as TabType, label: '粉丝', icon: Users, count: profile?.followerCount || 0 },
   ];
@@ -404,7 +404,7 @@ export default function Profile() {
                           isOwnProfile
                             ? {
                                 label: '创建提示词',
-                                href: '/prompts/new',
+                                href: '/create',
                               }
                             : undefined
                         }

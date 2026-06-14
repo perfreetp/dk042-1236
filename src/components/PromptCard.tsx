@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Heart, Copy, TrendingUp, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TagBadge from './TagBadge';
@@ -29,6 +29,13 @@ export default function PromptCard({
 }: PromptCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const navigate = useNavigate();
+
+  const handleAuthorClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/profile/${prompt.authorId}`);
+  };
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -105,7 +112,7 @@ export default function PromptCard({
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-ink-100">
-          <div className="flex items-center gap-3">
+          <div onClick={handleAuthorClick} className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
             <img
               src={prompt.author?.avatar}
               alt={prompt.author?.username}

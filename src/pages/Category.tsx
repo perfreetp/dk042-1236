@@ -30,7 +30,7 @@ export default function Category() {
     return tagParam ? tagParam.split(',').map(Number).filter(Boolean) : [];
   }, [searchParams]);
 
-  const sortBy = searchParams.get('sort') || 'latest';
+  const sortBy = searchParams.get('sort') || 'createdAt';
   const currentPage = Number(searchParams.get('page')) || 1;
   const purpose = searchParams.get('purpose') || undefined;
   const model = searchParams.get('model') || undefined;
@@ -47,10 +47,11 @@ export default function Category() {
       model,
       language,
       difficulty,
-      sort: mapSortParam(sortBy),
+      sort: sortBy,
       page: currentPage,
       pageSize: 12,
       tags: selectedTags.length > 0 ? selectedTags : undefined,
+      status: 'approved',
     };
     setFilters(filters);
     fetchPrompts(filters);
@@ -68,17 +69,6 @@ export default function Category() {
     } finally {
       setTagsLoading(false);
     }
-  };
-
-  const mapSortParam = (param: string): string => {
-    const sortMap: Record<string, string> = {
-      latest: 'createdAt',
-      rating: 'rating',
-      favorites: 'favoriteCount',
-      copies: 'copyCount',
-      views: 'viewCount',
-    };
-    return sortMap[param] || 'createdAt';
   };
 
   const handleTagToggle = (tagId: number) => {

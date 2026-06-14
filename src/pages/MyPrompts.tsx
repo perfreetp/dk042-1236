@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText,
   Clock,
@@ -56,23 +56,36 @@ interface StatsOverview {
   totalCopies: number;
   totalFavorites: number;
   totalPrompts: number;
+  approvedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
   viewsChange: number;
   copiesChange: number;
 }
 
 export default function MyPrompts() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuthStore();
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<TabType>('approved');
+  const statusFromUrl = (searchParams.get('status') as TabType) || 'approved';
+  const [activeTab, setActiveTab] = useState<TabType>(statusFromUrl);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [statusCounts, setStatusCounts] = useState<Record<TabType, number>>({
+    approved: 0,
+    pending: 0,
+    rejected: 0,
+  });
   const [stats, setStats] = useState<StatsOverview>({
     totalViews: 0,
     totalCopies: 0,
     totalFavorites: 0,
     totalPrompts: 0,
+    approvedCount: 0,
+    pendingCount: 0,
+    rejectedCount: 0,
     viewsChange: 12.5,
     copiesChange: 8.3,
   });
@@ -80,35 +93,44 @@ export default function MyPrompts() {
   const [promptToDelete, setPromptToDelete] = useState<Prompt | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const loadPrompts = async (status: TabType) => {
+  const [allPrompts, setAllPrompts] = useState<Prompt[]>([]);
+
+  const loadPrompts = async () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const res = await apiClient.get<PaginatedResponse<Prompt>>(
-        `/prompts?authorId=${user.id}&status=${status}&pageSize=100`
+      const allRes = await apiClient.get<PaginatedResponse<Prompt>>(
+        `/prompts?authorId=${user.id}&pageSize=1000`
       );
-      if (res.success && res.data) {
-        setPrompts(res.data.items);
-      }
+      if (allRes.success && allRes.data) {
+        const all = allRes.data.items;
+        setAllPrompts(all);
 
-      if (status === 'approved') {
-        const allRes = await apiClient.get<PaginatedResponse<Prompt>>(
-          `/prompts?authorId=${user.id}&pageSize=1000`
-        );
-        if (allRes.success && allRes.data) {
-          const allPrompts = allRes.data.items;
-          setStats({
-            totalViews: allPrompts.reduce((sum, p) => sum + p.viewCount, 0),
-            totalCopies: allPrompts.reduce((sum, p) => sum + p.copyCount, 0),
-            totalFavorites: allPrompts.reduce(
-              (sum, p) => sum + p.favoriteCount,
-              0
-            ),
-            totalPrompts: allPrompts.length,
-            viewsChange: 12.5,
-            copiesChange: 8.3,
-          });
-        }
+        const counts: Record<TabType, number> = {
+          approved: 0,
+          pending: 0,
+          rejected: 0,
+        };
+        all.forEach((p) => {
+          if (p.status === 'approved' || p.status === 'pending' || p.status === 'rejected') {
+            counts[p.status]++;
+          }
+        });
+        setStatusCounts(counts);
+
+        setPrompts(all.filter((p) => p.status === activeTab));
+
+        setStats({
+          totalViews: all.reduce((sum, p) => sum + p.viewCount, 0),
+          totalCopies: all.reduce((sum, p) => sum + p.copyCount, 0),
+          totalFavorites: all.reduce((sum, p) => sum + p.favoriteCount, 0),
+          totalPrompts: all.length,
+          approvedCount: counts.approved,
+          pendingCount: counts.pending,
+          rejectedCount: counts.rejected,
+          viewsChange: 12.5,
+          copiesChange: 8.3,
+        });
       }
     } catch {
       toast.error('加载失败，请稍后重试');
@@ -119,10 +141,15 @@ export default function MyPrompts() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      loadPrompts(activeTab);
+      loadPrompts();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, user, isAuthenticated]);
+  }, [user, isAuthenticated]);
+
+  useEffect(() => {
+    setPrompts(allPrompts.filter((p) => p.status === activeTab));
+    setSearchParams({ status: activeTab }, { replace: true });
+  }, [activeTab, allPrompts, setSearchParams]);
 
   const handleDelete = async () => {
     if (!promptToDelete) return;
@@ -130,7 +157,13 @@ export default function MyPrompts() {
     try {
       const res = await apiClient.delete(`/prompts/${promptToDelete.id}`);
       if (res.success) {
-        setPrompts(prompts.filter((p) => p.id !== promptToDelete.id));
+        const newAllPrompts = allPrompts.filter((p) => p.id !== promptToDelete.id);
+        setAllPrompts(newAllPrompts);
+        setPrompts(newAllPrompts.filter((p) => p.status === activeTab));
+        setStatusCounts((prev) => ({
+          ...prev,
+          [promptToDelete.status]: prev[promptToDelete.status as TabType] - 1,
+        }));
         toast.success('删除成功');
         setShowDeleteModal(false);
         setPromptToDelete(null);
@@ -181,9 +214,9 @@ export default function MyPrompts() {
   }
 
   const tabs = [
-    { id: 'approved' as TabType, ...statusConfig.approved, count: stats.totalPrompts },
-    { id: 'pending' as TabType, ...statusConfig.pending, count: 0 },
-    { id: 'rejected' as TabType, ...statusConfig.rejected, count: 0 },
+    { id: 'approved' as TabType, ...statusConfig.approved, count: statusCounts.approved },
+    { id: 'pending' as TabType, ...statusConfig.pending, count: statusCounts.pending },
+    { id: 'rejected' as TabType, ...statusConfig.rejected, count: statusCounts.rejected },
   ];
 
   return (
@@ -198,7 +231,7 @@ export default function MyPrompts() {
             <p className="text-ink-500">管理你发布的所有提示词</p>
           </div>
           <Link
-            to="/prompts/new"
+            to="/create"
             className="btn-primary bg-amber-500 text-cream-50"
           >
             <Plus className="w-4 h-4" />
@@ -389,7 +422,7 @@ export default function MyPrompts() {
                   activeTab === 'approved'
                     ? {
                         label: '创建提示词',
-                        href: '/prompts/new',
+                        href: '/create',
                       }
                     : undefined
                 }
@@ -476,9 +509,9 @@ export default function MyPrompts() {
                         <TrendingUp className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => navigate(`/prompts/${prompt.id}/stats`)}
+                        onClick={() => navigate(`/prompt/${prompt.id}`)}
                         className="p-2 text-ink-500 hover:text-ink-700 hover:bg-ink-100 rounded-lg transition-colors"
-                        title="数据统计"
+                        title="查看详情"
                       >
                         <BarChart3 className="w-4 h-4" />
                       </button>

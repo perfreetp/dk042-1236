@@ -21,7 +21,6 @@ import Modal from '@/components/Modal';
 import type {
   Favorite,
   FavoriteGroup,
-  PaginatedResponse,
 } from '../../shared/types';
 
 export default function Favorites() {
@@ -36,7 +35,7 @@ export default function Favorites() {
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [targetGroupId, setTargetGroupId] = useState<number | null>(null);
+  const [targetGroupId, setTargetGroupId] = useState<number | null | undefined>(undefined);
   const [isSelectMode, setIsSelectMode] = useState(false);
 
   const loadData = async () => {
@@ -45,7 +44,7 @@ export default function Favorites() {
     try {
       const [groupsRes, favsRes] = await Promise.all([
         apiClient.get<FavoriteGroup[]>(`/favorites/groups`),
-        apiClient.get<PaginatedResponse<Favorite>>(
+        apiClient.get<Favorite[]>(
           selectedGroupId
             ? `/favorites?groupId=${selectedGroupId}`
             : '/favorites'
@@ -56,7 +55,7 @@ export default function Favorites() {
         setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
       }
       if (favsRes.success && favsRes.data) {
-        setFavorites(favsRes.data.items || []);
+        setFavorites(Array.isArray(favsRes.data) ? favsRes.data : []);
       }
     } catch {
       toast.error('加载收藏失败，请稍后重试');
@@ -72,6 +71,42 @@ export default function Favorites() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGroupId, user, isAuthenticated]);
 
+  const decrementGroupCount = (groupId: number | null, amount: number = 1) => {
+    if (groupId === null) return;
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? { ...g, promptCount: Math.max(0, g.promptCount - amount) }
+          : g
+      )
+    );
+  };
+
+  const incrementGroupCount = (groupId: number | null, amount: number = 1) => {
+    if (groupId === null) return;
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId ? { ...g, promptCount: g.promptCount + amount } : g
+      )
+    );
+  };
+
+  const cleanupSelectedIds = (currentFavorites: Favorite[]) => {
+    const validIds = new Set(currentFavorites.map((f) => f.id));
+    setSelectedIds((prev) => {
+      let changed = false;
+      const next = new Set<number>();
+      prev.forEach((id) => {
+        if (validIds.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  };
+
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) {
       toast.error('请输入分组名称');
@@ -82,7 +117,7 @@ export default function Favorites() {
         name: newGroupName.trim(),
       });
       if (response.success && response.data) {
-        setGroups([...groups, response.data]);
+        setGroups((prev) => [...prev, response.data!]);
         setShowNewGroupModal(false);
         setNewGroupName('');
         toast.success('分组创建成功');
@@ -98,9 +133,21 @@ export default function Favorites() {
     try {
       const response = await apiClient.delete(`/favorites/groups/${groupId}`);
       if (response.success) {
-        setGroups(groups.filter((g) => g.id !== groupId));
+        setGroups((prev) => prev.filter((g) => g.id !== groupId));
         if (selectedGroupId === groupId) {
           setSelectedGroupId(null);
+          const allFavsRes = await apiClient.get<Favorite[]>('/favorites');
+          if (allFavsRes.success && allFavsRes.data) {
+            const allFavs = Array.isArray(allFavsRes.data) ? allFavsRes.data : [];
+            setFavorites(allFavs);
+            cleanupSelectedIds(allFavs);
+          }
+        } else {
+          const updatedFavs = favorites.map((f) =>
+            f.groupId === groupId ? { ...f, groupId: null } : f
+          );
+          setFavorites(updatedFavs);
+          cleanupSelectedIds(updatedFavs);
         }
         toast.success('分组删除成功');
       }
@@ -110,13 +157,15 @@ export default function Favorites() {
   };
 
   const handleToggleSelect = (favoriteId: number) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(favoriteId)) {
-      newSelected.delete(favoriteId);
-    } else {
-      newSelected.add(favoriteId);
-    }
-    setSelectedIds(newSelected);
+    setSelectedIds((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(favoriteId)) {
+        newSelected.delete(favoriteId);
+      } else {
+        newSelected.add(favoriteId);
+      }
+      return newSelected;
+    });
   };
 
   const handleSelectAll = () => {
@@ -129,19 +178,39 @@ export default function Favorites() {
 
   const handleRemoveSelected = async () => {
     if (selectedIds.size === 0) return;
+    const removedCount = selectedIds.size;
     try {
       const selectedItems = favorites.filter((f) => selectedIds.has(f.id));
       const selectedPromptIds = selectedItems.map((f) => f.promptId);
+
+      const groupCountChanges = new Map<number, number>();
+      selectedItems.forEach((f) => {
+        if (f.groupId !== null) {
+          groupCountChanges.set(
+            f.groupId,
+            (groupCountChanges.get(f.groupId) || 0) + 1
+          );
+        }
+      });
+
       await Promise.all(
         selectedPromptIds.map((promptId) =>
           apiClient.delete(`/favorites/${promptId}`)
         )
       );
+
       const promptIdSet = new Set(selectedPromptIds);
-      setFavorites(favorites.filter((f) => !promptIdSet.has(f.promptId)));
+      const newFavorites = favorites.filter((f) => !promptIdSet.has(f.promptId));
+      setFavorites(newFavorites);
+
+      groupCountChanges.forEach((count, gid) => {
+        decrementGroupCount(gid, count);
+      });
+
       setSelectedIds(new Set());
       setIsSelectMode(false);
-      toast.success(`已移除 ${selectedIds.size} 个收藏`);
+      cleanupSelectedIds(newFavorites);
+      toast.success(`已移除 ${removedCount} 个收藏`);
     } catch {
       toast.error('移除失败，请稍后重试');
     }
@@ -149,17 +218,51 @@ export default function Favorites() {
 
   const handleMoveSelected = async () => {
     if (selectedIds.size === 0 || targetGroupId === undefined) return;
+    const movedCount = selectedIds.size;
     try {
+      const selectedItems = favorites.filter((f) => selectedIds.has(f.id));
+
+      const sourceGroupCounts = new Map<number, number>();
+      selectedItems.forEach((f) => {
+        if (f.groupId !== null) {
+          sourceGroupCounts.set(
+            f.groupId,
+            (sourceGroupCounts.get(f.groupId) || 0) + 1
+          );
+        }
+      });
+
       await Promise.all(
         Array.from(selectedIds).map((id) =>
           apiClient.put(`/favorites/${id}`, { groupId: targetGroupId })
         )
       );
-      setFavorites(favorites.filter((f) => !selectedIds.has(f.id)));
+
+      sourceGroupCounts.forEach((count, gid) => {
+        decrementGroupCount(gid, count);
+      });
+      incrementGroupCount(targetGroupId, selectedItems.length);
+
+      const isCurrentlyViewingSpecificGroup = selectedGroupId !== null;
+      const isMovingOutOfCurrentGroup =
+        isCurrentlyViewingSpecificGroup && targetGroupId !== selectedGroupId;
+
+      if (isMovingOutOfCurrentGroup) {
+        const newFavorites = favorites.filter((f) => !selectedIds.has(f.id));
+        setFavorites(newFavorites);
+        cleanupSelectedIds(newFavorites);
+      } else {
+        const newFavorites = favorites.map((f) =>
+          selectedIds.has(f.id) ? { ...f, groupId: targetGroupId } : f
+        );
+        setFavorites(newFavorites);
+      }
+
       setSelectedIds(new Set());
       setIsSelectMode(false);
       setShowMoveModal(false);
-      toast.success(`已移动 ${selectedIds.size} 个收藏`);
+      setTargetGroupId(undefined);
+      toast.success(`已移动 ${movedCount} 个收藏`);
     } catch {
       toast.error('移动失败，请稍后重试');
     }
@@ -171,7 +274,10 @@ export default function Favorites() {
     try {
       const response = await apiClient.delete(`/favorites/${fav.promptId}`);
       if (response.success) {
-        setFavorites(favorites.filter((f) => f.promptId !== fav.promptId));
+        const newFavorites = favorites.filter((f) => f.promptId !== fav.promptId);
+        setFavorites(newFavorites);
+        decrementGroupCount(fav.groupId);
+        cleanupSelectedIds(newFavorites);
         toast.success('已取消收藏');
       }
     } catch {
@@ -354,7 +460,10 @@ export default function Favorites() {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setShowMoveModal(true)}
+                      onClick={() => {
+                        setTargetGroupId(undefined);
+                        setShowMoveModal(true);
+                      }}
                       disabled={selectedIds.size === 0}
                       className="btn-ghost text-sm py-1.5 disabled:opacity-50"
                     >
@@ -511,7 +620,7 @@ export default function Favorites() {
             </button>
             <button
               onClick={handleMoveSelected}
-              disabled={targetGroupId === null}
+              disabled={targetGroupId === undefined}
               className="btn-primary bg-amber-500 text-cream-50 disabled:opacity-50"
             >
               移动

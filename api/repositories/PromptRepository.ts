@@ -117,10 +117,11 @@ export interface PromptFilters {
   status?: string
   authorId?: number
   isFeatured?: boolean
+  tags?: number[]
 }
 
 export interface PromptSort {
-  field: 'createdAt' | 'rating' | 'copyCount' | 'favoriteCount'
+  field: 'createdAt' | 'rating' | 'copyCount' | 'favoriteCount' | 'viewCount' | 'forkCount'
   order: 'asc' | 'desc'
 }
 
@@ -133,6 +134,7 @@ export const PromptRepository = {
   ): Promise<{ items: Prompt[]; total: number }> {
     const whereClauses: string[] = []
     const params: any[] = []
+    let joinSql = ''
 
     if (filters.purpose) {
       whereClauses.push('p.purpose = ?')
@@ -167,6 +169,12 @@ export const PromptRepository = {
       whereClauses.push('p.is_featured = ?')
       params.push(filters.isFeatured ? 1 : 0)
     }
+    if (filters.tags && filters.tags.length > 0) {
+      joinSql = 'INNER JOIN prompt_tags pt ON pt.prompt_id = p.id'
+      const placeholders = filters.tags.map(() => '?').join(', ')
+      whereClauses.push(`pt.tag_id IN (${placeholders})`)
+      params.push(...filters.tags)
+    }
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
 
@@ -174,12 +182,15 @@ export const PromptRepository = {
       createdAt: 'p.created_at',
       rating: 'p.rating',
       copyCount: 'p.copy_count',
-      favoriteCount: 'p.favorite_count'
+      favoriteCount: 'p.favorite_count',
+      viewCount: 'p.view_count',
+      forkCount: 'p.fork_count'
     }
     const orderSql = `ORDER BY ${sortMap[sort.field] || 'p.created_at'} ${sort.order.toUpperCase()}`
 
     const countSql = `
-      SELECT COUNT(*) as total FROM prompts p
+      SELECT COUNT(DISTINCT p.id) as total FROM prompts p
+      ${joinSql}
       ${whereSql}
     `
     const countResult = db.getOne<{ total: number }>(countSql, params)
@@ -187,7 +198,8 @@ export const PromptRepository = {
 
     const offset = (page - 1) * pageSize
     const dataSql = `
-      SELECT p.* FROM prompts p
+      SELECT DISTINCT p.* FROM prompts p
+      ${joinSql}
       ${whereSql}
       ${orderSql}
       LIMIT ? OFFSET ?

@@ -40,7 +40,7 @@ import EmptyState from '@/components/EmptyState';
 import { formatDate, formatNumber, getDifficultyLabel } from '@/utils/formatters';
 import { REPORT_REASONS } from '@/utils/constants';
 import { apiClient } from '@/lib/apiClient';
-import type { Prompt, Comment, CreateCommentRequest, CreateReportRequest } from '../../shared/types';
+import type { Prompt, Comment, CreateCommentRequest, CreateReportRequest, PaginatedResponse } from '../../shared/types';
 
 const sidebarSections = [
   { id: 'content', label: '提示词内容', icon: Code2 },
@@ -56,7 +56,7 @@ const difficultyConfig = {
 };
 
 export default function PromptDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { promptId: idParam } = useParams<{ promptId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isCopied, copy } = useCopy();
@@ -83,7 +83,7 @@ export default function PromptDetail() {
   const codeRef = useRef<HTMLPreElement>(null);
   const versionDropdownRef = useRef<HTMLDivElement>(null);
 
-  const promptId = id ? parseInt(id, 10) : 0;
+  const promptId = idParam ? parseInt(idParam, 10) : 0;
 
   useEffect(() => {
     if (promptId) {
@@ -147,10 +147,10 @@ export default function PromptDetail() {
   const fetchRelated = async () => {
     setRelatedLoading(true);
     apiClient
-      .get<Prompt[]>(`/prompts/${promptId}/related`)
+      .get<PaginatedResponse<Prompt>>('/prompts?pageSize=3&status=approved')
       .then((response) => {
         if (response.success && response.data) {
-          setRelatedPrompts(response.data);
+          setRelatedPrompts(response.data.items);
         }
       })
       .finally(() => setRelatedLoading(false));

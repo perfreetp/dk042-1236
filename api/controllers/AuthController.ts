@@ -2,6 +2,8 @@ import { Response, NextFunction } from 'express'
 import { z } from 'zod'
 import { AuthRequest } from '../middleware/auth'
 import AuthService from '../services/AuthService'
+import UserRepository from '../repositories/UserRepository'
+import { AppError } from '../middleware/errorHandler'
 import type { ApiResponse, AuthResponse, User, RegisterRequest, LoginRequest } from '../../shared/types'
 
 const registerSchema = z.object({
@@ -100,6 +102,33 @@ export const AuthController = {
         success: true,
         data: user,
         message: '资料更新成功'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async getUserById(
+    req: AuthRequest,
+    res: Response<ApiResponse<User>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const id = parseInt(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的用户 ID'
+        })
+        return
+      }
+      const user = await UserRepository.findById(id)
+      if (!user) {
+        throw new AppError('用户不存在', 404)
+      }
+      res.json({
+        success: true,
+        data: user
       })
     } catch (error) {
       next(error)

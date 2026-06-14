@@ -48,6 +48,13 @@ interface Stats {
   totalPrompts: number;
 }
 
+interface TabLoadingState {
+  content: boolean;
+  tags: boolean;
+  reports: boolean;
+  home: boolean;
+}
+
 const tabConfig: Record<
   AdminTab,
   { label: string; icon: typeof Shield; color: string }
@@ -105,10 +112,16 @@ export default function Admin() {
     totalPrompts: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [tabLoading, setTabLoading] = useState<TabLoadingState>({
+    content: false,
+    tags: false,
+    reports: false,
+    home: false,
+  });
   const [pendingPrompts, setPendingPrompts] = useState<Prompt[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
-  const [, setHomeConfig] = useState<HomeConfig | null>(null);
+  const [homeConfig, setHomeConfig] = useState<HomeConfig | null>(null);
   const [allPrompts, setAllPrompts] = useState<Prompt[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
 
@@ -133,6 +146,10 @@ export default function Admin() {
     linkUrl: '',
   });
 
+  const setTabLoadingState = (tab: AdminTab, loading: boolean) => {
+    setTabLoading((prev) => ({ ...prev, [tab]: loading }));
+  };
+
   const loadStats = async () => {
     try {
       const [pendingRes, reportsRes, usersRes, promptsRes] =
@@ -154,20 +171,25 @@ export default function Admin() {
     }
   };
 
-  const loadPendingPrompts = async () => {
+  const loadPendingPrompts = async (showLoading = false) => {
+    if (showLoading) setTabLoadingState('content', true);
     try {
       const res = await apiClient.get<PaginatedResponse<Prompt>>(
         '/admin/prompts/pending'
       );
       if (res.success && res.data) {
-        setPendingPrompts(res.data.items || []);
+        const items = Array.isArray(res.data) ? res.data : res.data.items || [];
+        setPendingPrompts(items);
       }
     } catch {
       toast.error('加载待审核内容失败');
+    } finally {
+      if (showLoading) setTabLoadingState('content', false);
     }
   };
 
-  const loadTags = async () => {
+  const loadTags = async (showLoading = false) => {
+    if (showLoading) setTabLoadingState('tags', true);
     try {
       const res = await apiClient.get<Tag[]>('/tags');
       if (res.success && res.data) {
@@ -175,21 +197,28 @@ export default function Admin() {
       }
     } catch {
       toast.error('加载标签失败');
+    } finally {
+      if (showLoading) setTabLoadingState('tags', false);
     }
   };
 
-  const loadReports = async () => {
+  const loadReports = async (showLoading = false) => {
+    if (showLoading) setTabLoadingState('reports', true);
     try {
-      const res = await apiClient.get<Report[]>('/admin/reports');
+      const res = await apiClient.get<PaginatedResponse<Report>>('/admin/reports');
       if (res.success && res.data) {
-        setReports(res.data);
+        const items = Array.isArray(res.data) ? res.data : res.data.items || [];
+        setReports(items);
       }
     } catch {
       toast.error('加载举报列表失败');
+    } finally {
+      if (showLoading) setTabLoadingState('reports', false);
     }
   };
 
-  const loadHomeConfig = async () => {
+  const loadHomeConfig = async (showLoading = false) => {
+    if (showLoading) setTabLoadingState('home', true);
     try {
       const [configRes, promptsRes, bannersRes] = await Promise.all([
         apiClient.get<HomeConfig>('/admin/home-config'),
@@ -201,13 +230,16 @@ export default function Admin() {
         setHomeConfig(configRes.data);
       }
       if (promptsRes.success && promptsRes.data) {
-        setAllPrompts(promptsRes.data.items || []);
+        const items = Array.isArray(promptsRes.data) ? promptsRes.data : promptsRes.data.items || [];
+        setAllPrompts(items);
       }
       if (bannersRes.success && bannersRes.data) {
         setBanners(Array.isArray(bannersRes.data) ? bannersRes.data : []);
       }
     } catch {
       toast.error('加载首页配置失败');
+    } finally {
+      if (showLoading) setTabLoadingState('home', false);
     }
   };
 
@@ -225,11 +257,25 @@ export default function Admin() {
 
     const loadData = async () => {
       setIsLoading(true);
-      await loadStats();
-      await loadPendingPrompts();
-      await loadTags();
-      await loadReports();
-      await loadHomeConfig();
+      setTabLoading({
+        content: true,
+        tags: true,
+        reports: true,
+        home: true,
+      });
+      await Promise.all([
+        loadStats(),
+        loadPendingPrompts(),
+        loadTags(),
+        loadReports(),
+        loadHomeConfig(),
+      ]);
+      setTabLoading({
+        content: false,
+        tags: false,
+        reports: false,
+        home: false,
+      });
       setIsLoading(false);
     };
 
@@ -242,16 +288,16 @@ export default function Admin() {
 
     switch (activeTab) {
       case 'content':
-        loadPendingPrompts();
+        loadPendingPrompts(true);
         break;
       case 'tags':
-        loadTags();
+        loadTags(true);
         break;
       case 'reports':
-        loadReports();
+        loadReports(true);
         break;
       case 'home':
-        loadHomeConfig();
+        loadHomeConfig(true);
         break;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -261,8 +307,15 @@ export default function Admin() {
     try {
       const res = await apiClient.post(`/admin/prompts/${promptId}/approve`);
       if (res.success) {
+        const approved = pendingPrompts.find((p) => p.id === promptId);
         setPendingPrompts(pendingPrompts.filter((p) => p.id !== promptId));
-        setStats((s) => ({ ...s, pendingCount: s.pendingCount - 1 }));
+        setStats((s) => ({ ...s, pendingCount: Math.max(0, s.pendingCount - 1) }));
+        if (approved) {
+          setAllPrompts((prev) => [
+            { ...approved, status: 'approved' },
+            ...prev.filter((p) => p.id !== promptId),
+          ]);
+        }
         toast.success('审核通过');
       }
     } catch {
@@ -284,7 +337,7 @@ export default function Admin() {
         setPendingPrompts(
           pendingPrompts.filter((p) => p.id !== rejectPromptId)
         );
-        setStats((s) => ({ ...s, pendingCount: s.pendingCount - 1 }));
+        setStats((s) => ({ ...s, pendingCount: Math.max(0, s.pendingCount - 1) }));
         toast.success('已拒绝');
         setShowRejectModal(false);
         setRejectPromptId(null);
@@ -336,10 +389,16 @@ export default function Admin() {
 
   const handleResolveReport = async (reportId: number, action: 'resolve' | 'reject') => {
     try {
+      const report = reports.find((r) => r.id === reportId);
       const res = await apiClient.post(`/admin/reports/${reportId}/${action}`);
       if (res.success) {
-        loadReports();
-        loadStats();
+        const newStatus = action === 'resolve' ? 'resolved' : 'rejected';
+        setReports((prev) =>
+          prev.map((r) => (r.id === reportId ? { ...r, status: newStatus } : r))
+        );
+        if (report && report.status === 'pending') {
+          setStats((s) => ({ ...s, reportsCount: Math.max(0, s.reportsCount - 1) }));
+        }
         toast.success(action === 'resolve' ? '已处理举报' : '已驳回举报');
       }
     } catch {
@@ -350,10 +409,25 @@ export default function Admin() {
   const handleRemoveContent = async (promptId: number) => {
     if (!confirm('确定要下架这个提示词吗？')) return;
     try {
+      const relatedReports = reports.filter(
+        (r) => r.promptId === promptId && r.status === 'pending'
+      );
       const res = await apiClient.post(`/admin/prompts/${promptId}/remove`);
       if (res.success) {
-        loadReports();
-        loadStats();
+        setReports((prev) =>
+          prev.map((r) =>
+            r.promptId === promptId ? { ...r, status: 'resolved' } : r
+          )
+        );
+        if (relatedReports.length > 0) {
+          setStats((s) => ({
+            ...s,
+            reportsCount: Math.max(0, s.reportsCount - relatedReports.length),
+          }));
+        }
+        setAllPrompts((prev) =>
+          prev.map((p) => (p.id === promptId ? { ...p, status: 'removed' } : p))
+        );
         toast.success('内容已下架');
       }
     } catch {
@@ -405,14 +479,26 @@ export default function Admin() {
       const prompt = allPrompts.find((p) => p.id === promptId);
       if (!prompt) return;
 
+      const newIsFeatured = !prompt.isFeatured;
       const res = await apiClient.put(`/admin/prompts/${promptId}`, {
-        isFeatured: !prompt.isFeatured,
+        isFeatured: newIsFeatured,
       });
 
       if (res.success) {
-        loadHomeConfig();
+        setAllPrompts((prev) =>
+          prev.map((p) =>
+            p.id === promptId ? { ...p, isFeatured: newIsFeatured } : p
+          )
+        );
+        setHomeConfig((prev) => {
+          if (!prev) return prev;
+          const featuredPrompts = newIsFeatured
+            ? [...prev.featuredPrompts, promptId]
+            : prev.featuredPrompts.filter((id) => id !== promptId);
+          return { ...prev, featuredPrompts };
+        });
         toast.success(
-          prompt.isFeatured ? '已取消精选' : '已设为精选'
+          newIsFeatured ? '已设为精选' : '已取消精选'
         );
       }
     } catch {
@@ -463,6 +549,8 @@ export default function Admin() {
     );
   }
 
+  const featuredCount = homeConfig?.featuredPrompts?.length || allPrompts.filter((p) => p.isFeatured).length;
+
   const statCards = [
     {
       label: '待审核',
@@ -489,6 +577,13 @@ export default function Admin() {
       color: 'bg-moss-500/10 text-moss-600',
     },
   ];
+
+  const renderTabLoading = () => (
+    <div className="p-12 text-center">
+      <Loader2 className="w-8 h-8 text-amber-500 animate-spin mx-auto mb-4" />
+      <p className="text-ink-500">加载中...</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen pt-20 pb-12 bg-cream-100">
@@ -575,7 +670,9 @@ export default function Admin() {
                   </h3>
                 </div>
 
-                {pendingPrompts.length === 0 ? (
+                {tabLoading.content ? (
+                  renderTabLoading()
+                ) : pendingPrompts.length === 0 ? (
                   <div className="p-12 text-center">
                     <CheckCircle2 className="w-16 h-16 text-moss-500 mx-auto mb-4" />
                     <h4 className="text-lg font-semibold text-ink-900 mb-2 font-display">
@@ -657,55 +754,63 @@ export default function Admin() {
                   </button>
                 </div>
 
-                <div className="p-4">
-                  {(['purpose', 'model', 'language', 'difficulty'] as const).map(
-                    (category) => {
-                      const tags = allTags.filter((t) => t.category === category);
-                      return (
-                        <div key={category} className="mb-6 last:mb-0">
-                          <h4 className="text-sm font-medium text-ink-700 mb-3">
-                            {CATEGORY_LABELS[category]}
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {tags.map((tag) => (
-                              <div
-                                key={tag.id}
-                                className="flex items-center justify-between p-3 bg-cream-100 rounded-lg group hover:bg-ink-100 transition-colors"
-                              >
-                                <div className="flex items-center gap-3">
+                {tabLoading.tags ? (
+                  renderTabLoading()
+                ) : (
+                  <div className="p-4">
+                    {(['purpose', 'model', 'language', 'difficulty'] as const).map(
+                      (category) => {
+                        const tags = allTags.filter((t) => t.category === category);
+                        return (
+                          <div key={category} className="mb-6 last:mb-0">
+                            <h4 className="text-sm font-medium text-ink-700 mb-3">
+                              {CATEGORY_LABELS[category]}
+                            </h4>
+                            {tags.length === 0 ? (
+                              <p className="text-sm text-ink-500">暂无标签</p>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {tags.map((tag) => (
                                   <div
-                                    className="w-4 h-4 rounded-full"
-                                    style={{ backgroundColor: tag.color }}
-                                  />
-                                  <span className="font-medium text-ink-900">
-                                    {tag.name}
-                                  </span>
-                                  <span className="text-xs text-ink-500">
-                                    ({tag.promptCount})
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => openTagModal(tag)}
-                                    className="p-1.5 text-ink-500 hover:text-amber-600 hover:bg-amber-500/10 rounded-md transition-colors"
+                                    key={tag.id}
+                                    className="flex items-center justify-between p-3 bg-cream-100 rounded-lg group hover:bg-ink-100 transition-colors"
                                   >
-                                    <Edit3 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTag(tag.id)}
-                                    className="p-1.5 text-ink-500 hover:text-vermilion-500 hover:bg-vermilion-500/10 rounded-md transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
+                                    <div className="flex items-center gap-3">
+                                      <div
+                                        className="w-4 h-4 rounded-full"
+                                        style={{ backgroundColor: tag.color }}
+                                      />
+                                      <span className="font-medium text-ink-900">
+                                        {tag.name}
+                                      </span>
+                                      <span className="text-xs text-ink-500">
+                                        ({tag.promptCount})
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button
+                                        onClick={() => openTagModal(tag)}
+                                        className="p-1.5 text-ink-500 hover:text-amber-600 hover:bg-amber-500/10 rounded-md transition-colors"
+                                      >
+                                        <Edit3 className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteTag(tag.id)}
+                                        className="p-1.5 text-ink-500 hover:text-vermilion-500 hover:bg-vermilion-500/10 rounded-md transition-colors"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
-                        </div>
-                      );
-                    }
-                  )}
-                </div>
+                        );
+                      }
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -718,7 +823,9 @@ export default function Admin() {
                   </h3>
                 </div>
 
-                {reports.length === 0 ? (
+                {tabLoading.reports ? (
+                  renderTabLoading()
+                ) : reports.length === 0 ? (
                   <div className="p-12 text-center">
                     <CheckCircle2 className="w-16 h-16 text-moss-500 mx-auto mb-4" />
                     <h4 className="text-lg font-semibold text-ink-900 mb-2 font-display">
@@ -813,57 +920,77 @@ export default function Admin() {
               <div className="space-y-6">
                 {/* Featured Prompts */}
                 <div className="bg-cream-50 rounded-xl border border-ink-100 shadow-card overflow-hidden">
-                  <div className="p-4 border-b border-ink-100">
-                    <h3 className="font-display text-lg font-semibold text-ink-900">
-                      精选提示词
-                    </h3>
-                  </div>
-
-                  <div className="p-4">
-                    <div className="space-y-3">
-                      {allPrompts.slice(0, 20).map((prompt) => (
-                        <div
-                          key={prompt.id}
-                          className="flex items-center justify-between p-3 bg-cream-100 rounded-lg hover:bg-ink-100 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3">
-                              <span className="font-medium text-ink-900 truncate">
-                                {prompt.title}
-                              </span>
-                              {prompt.isFeatured && (
-                                <span className="px-2 py-0.5 bg-amber-500 text-cream-50 text-xs font-medium rounded-md flex items-center gap-1">
-                                  <Star className="w-3 h-3" />
-                                  精选
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs text-ink-500">
-                              {prompt.author?.username} · {formatNumber(prompt.viewCount)} 浏览
-                            </span>
-                          </div>
-
-                          <button
-                            onClick={() => handleToggleFeatured(prompt.id)}
-                            className={cn(
-                              'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                              prompt.isFeatured
-                                ? 'bg-amber-500 text-cream-50 hover:bg-amber-600'
-                                : 'bg-ink-100 text-ink-700 hover:bg-ink-200'
-                            )}
-                          >
-                            <Star
-                              className={cn(
-                                'w-4 h-4 inline mr-1',
-                                prompt.isFeatured && 'fill-current'
-                              )}
-                            />
-                            {prompt.isFeatured ? '取消精选' : '设为精选'}
-                          </button>
-                        </div>
-                      ))}
+                  <div className="p-4 border-b border-ink-100 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-display text-lg font-semibold text-ink-900">
+                        精选提示词
+                      </h3>
+                      <p className="text-sm text-ink-500 mt-0.5">
+                        已选择 {featuredCount} 个精选提示词
+                      </p>
                     </div>
                   </div>
+
+                  {tabLoading.home ? (
+                    renderTabLoading()
+                  ) : allPrompts.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <FileText className="w-16 h-16 text-ink-300 mx-auto mb-4" />
+                      <h4 className="text-lg font-semibold text-ink-900 mb-2 font-display">
+                        暂无提示词
+                      </h4>
+                      <p className="text-ink-500">当前没有可设置的提示词</p>
+                    </div>
+                  ) : (
+                    <div className="p-4">
+                      <div className="space-y-3">
+                        {allPrompts.slice(0, 20).map((prompt) => {
+                          const isFeatured = prompt.isFeatured || homeConfig?.featuredPrompts?.includes(prompt.id);
+                          return (
+                            <div
+                              key={prompt.id}
+                              className="flex items-center justify-between p-3 bg-cream-100 rounded-lg hover:bg-ink-100 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-medium text-ink-900 truncate">
+                                    {prompt.title}
+                                  </span>
+                                  {isFeatured && (
+                                    <span className="px-2 py-0.5 bg-amber-500 text-cream-50 text-xs font-medium rounded-md flex items-center gap-1">
+                                      <Star className="w-3 h-3" />
+                                      精选
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-ink-500">
+                                  {prompt.author?.username} · {formatNumber(prompt.viewCount)} 浏览
+                                </span>
+                              </div>
+
+                              <button
+                                onClick={() => handleToggleFeatured(prompt.id)}
+                                className={cn(
+                                  'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                                  isFeatured
+                                    ? 'bg-amber-500 text-cream-50 hover:bg-amber-600'
+                                    : 'bg-ink-100 text-ink-700 hover:bg-ink-200'
+                                )}
+                              >
+                                <Star
+                                  className={cn(
+                                    'w-4 h-4 inline mr-1',
+                                    isFeatured && 'fill-current'
+                                  )}
+                                />
+                                {isFeatured ? '取消精选' : '设为精选'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Banners */}
@@ -881,13 +1008,15 @@ export default function Admin() {
                     </button>
                   </div>
 
-                  <div className="p-4">
-                    {banners.length === 0 ? (
-                      <div className="p-8 text-center">
-                        <Image className="w-12 h-12 text-ink-300 mx-auto mb-3" />
-                        <p className="text-ink-500">暂无横幅，点击上方按钮创建</p>
-                      </div>
-                    ) : (
+                  {tabLoading.home ? (
+                    renderTabLoading()
+                  ) : banners.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <Image className="w-12 h-12 text-ink-300 mx-auto mb-3" />
+                      <p className="text-ink-500">暂无横幅，点击上方按钮创建</p>
+                    </div>
+                  ) : (
+                    <div className="p-4">
                       <div className="space-y-4">
                         {banners.map((banner) => (
                           <div
@@ -927,8 +1056,8 @@ export default function Admin() {
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

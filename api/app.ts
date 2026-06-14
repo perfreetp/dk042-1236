@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url'
 import errorHandler, { notFoundHandler } from './middleware/errorHandler.js'
 
 import authRoutes from './routes/auth.js'
+import usersRoutes from './routes/users.js'
 import promptsRoutes from './routes/prompts.js'
 import tagsRoutes from './routes/tags.js'
 import favoritesRoutes from './routes/favorites.js'
@@ -32,6 +33,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use(morgan('combined'))
 
 app.use('/api/auth', authRoutes)
+app.use('/api/users', usersRoutes)
 app.use('/api/prompts', promptsRoutes)
 app.use('/api/tags', tagsRoutes)
 app.use('/api/favorites', favoritesRoutes)

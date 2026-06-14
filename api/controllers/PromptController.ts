@@ -33,9 +33,13 @@ const querySchema = z.object({
   language: z.string().optional(),
   difficulty: z.string().optional(),
   search: z.string().optional(),
-  status: z.string().default('approved'),
+  q: z.string().optional(),
+  status: z.string().optional(),
   isFeatured: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
-  sortBy: z.enum(['createdAt', 'rating', 'copyCount', 'favoriteCount']).default('createdAt'),
+  authorId: z.coerce.number().optional(),
+  tags: z.string().optional(),
+  sort: z.enum(['createdAt', 'rating', 'copyCount', 'favoriteCount', 'viewCount', 'forkCount']).default('createdAt'),
+  sortBy: z.enum(['createdAt', 'rating', 'copyCount', 'favoriteCount', 'viewCount', 'forkCount']).optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc')
 })
 
@@ -47,17 +51,29 @@ export const PromptController = {
   ): Promise<void> {
     try {
       const query = querySchema.parse(req.query)
+      const searchTerm = query.search || query.q
+      const sortField = query.sort || query.sortBy || 'createdAt'
+      const tagIds = query.tags
+        ? query.tags.split(',').map(t => parseInt(t.trim())).filter(t => !isNaN(t))
+        : undefined
+
+      const finalStatus = query.status !== undefined
+        ? query.status
+        : (query.authorId === undefined ? 'approved' : undefined)
+
       const result = await PromptService.getPrompts(
         {
           purpose: query.purpose,
           model: query.model,
           language: query.language,
           difficulty: query.difficulty,
-          search: query.search,
-          status: query.status,
-          isFeatured: query.isFeatured
+          search: searchTerm,
+          status: finalStatus,
+          isFeatured: query.isFeatured,
+          authorId: query.authorId,
+          tags: tagIds && tagIds.length > 0 ? tagIds : undefined
         },
-        { field: query.sortBy, order: query.sortOrder },
+        { field: sortField, order: query.sortOrder },
         query.page,
         query.pageSize
       )

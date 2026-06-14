@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Plus,
@@ -67,6 +67,7 @@ const DRAFT_STORAGE_KEY = 'prompt-draft';
 export default function CreatePrompt() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const params = useParams<{ promptId: string }>();
   const { user, isAuthenticated } = useAuthStore();
   const { toast } = useToast();
 
@@ -100,7 +101,7 @@ export default function CreatePrompt() {
       if (res.success && res.data) {
         const prompt = res.data;
         setFormData({
-          title: isFork ? `${prompt.title} (副本)` : prompt.title,
+          title: isFork ? `${prompt.title} (派生)` : prompt.title,
           description: prompt.description,
           content: prompt.content,
           tagIds: prompt.tags?.map((t) => t.id) || [],
@@ -160,18 +161,26 @@ export default function CreatePrompt() {
     loadTags();
     checkDraft();
 
-    const editParam = searchParams.get('edit');
+    const editParam = searchParams.get('edit') || params.promptId;
     const forkParam = searchParams.get('fork');
 
     if (editParam) {
+      setForkId(null);
       loadPrompt(parseInt(editParam), false);
     } else if (forkParam) {
       const id = parseInt(forkParam);
+      setEditId(null);
       setForkId(id);
       loadPrompt(id, true);
+    } else {
+      setEditId(null);
+      setForkId(null);
+      setFormData(initialFormData);
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      checkDraft();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, params.promptId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -249,22 +258,22 @@ export default function CreatePrompt() {
       };
 
       let response: ApiResponse<Prompt>;
+      let successMessage = '';
 
       if (editId) {
         response = await apiClient.put<Prompt>(`/prompts/${editId}`, requestData);
+        successMessage = '更新成功，等待审核';
       } else if (forkId) {
-        response = await apiClient.post<Prompt>(`/prompts/${forkId}/fork`);
+        response = await apiClient.post<Prompt>('/prompts', requestData);
+        successMessage = '派生成功，等待审核';
       } else {
         response = await apiClient.post<Prompt>('/prompts', requestData);
+        successMessage = '提交成功，等待审核';
       }
 
       if (response.success && response.data) {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
-        toast.success(
-          editId
-            ? '更新成功，等待审核'
-            : '提交成功，等待审核'
-        );
+        toast.success(successMessage);
         navigate('/my-prompts?status=pending');
       } else {
         toast.error(response.error || '提交失败');
@@ -332,7 +341,7 @@ export default function CreatePrompt() {
             </Link>
             <div>
               <h1 className="font-display text-2xl md:text-3xl font-bold text-ink-900">
-                {editId ? '编辑提示词' : forkId ? '创建新版本' : '创建提示词'}
+                {editId ? '编辑提示词' : forkId ? '派生提示词' : '创建提示词'}
               </h1>
               <p className="text-ink-500 text-sm">
                 分享你的提示词，帮助更多人

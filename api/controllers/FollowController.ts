@@ -129,6 +129,37 @@ export const FollowController = {
     } catch (error) {
       next(error)
     }
+  },
+
+  async checkFollowing(
+    req: AuthRequest,
+    res: Response<ApiResponse<{ isFollowing: boolean }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: '未授权访问'
+        })
+        return
+      }
+      const userId = parseInt(req.params.userId)
+      if (isNaN(userId)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的用户 ID'
+        })
+        return
+      }
+      const isFollowing = await FollowRepository.isFollowing(req.user.id, userId)
+      res.json({
+        success: true,
+        data: { isFollowing }
+      })
+    } catch (error) {
+      next(error)
+    }
   }
 }
 

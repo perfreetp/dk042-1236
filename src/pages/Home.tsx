@@ -25,7 +25,8 @@ import { usePromptStore } from '@/store/promptStore';
 import { useToast } from '@/hooks/useToast';
 import PromptCard, { PromptCardSkeleton } from '@/components/PromptCard';
 import { formatNumber } from '@/utils/formatters';
-import type { Prompt, Tag } from '../../shared/types';
+import apiClient from '@/lib/apiClient';
+import type { Prompt, Tag, PaginatedResponse } from '../../shared/types';
 
 const categories = [
   { id: 'writing', name: '写作', icon: PenTool, color: 'bg-amber-100 text-amber-700' },
@@ -51,19 +52,25 @@ const searchSuggestions = [
 export default function Home() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { featuredPrompts, prompts, loading, fetchFeatured, fetchPrompts, copyPrompt } =
+  const { featuredPrompts, loading, fetchFeatured, copyPrompt } =
     usePromptStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const sectionsRef = useRef<Record<string, HTMLElement | null>>({});
+  const [latestPromptsList, setLatestPromptsList] = useState<Prompt[]>([]);
+  const [trendingPromptsList, setTrendingPromptsList] = useState<Prompt[]>([]);
 
   useEffect(() => {
     fetchFeatured();
-    fetchPrompts({ sort: 'createdAt', pageSize: 8 });
-    fetchPrompts({ sort: 'viewCount', pageSize: 6, search: undefined, purpose: undefined });
-  }, [fetchFeatured, fetchPrompts]);
+    apiClient.get<PaginatedResponse<Prompt>>('/prompts?sort=createdAt&pageSize=8&status=approved').then(res => {
+      if (res.success && res.data) setLatestPromptsList(res.data.items);
+    });
+    apiClient.get<PaginatedResponse<Prompt>>('/prompts?sort=viewCount&pageSize=6&status=approved').then(res => {
+      if (res.success && res.data) setTrendingPromptsList(res.data.items);
+    });
+  }, [fetchFeatured]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -109,7 +116,7 @@ export default function Home() {
   };
 
   const handleCopy = async (promptId: number) => {
-    const prompt = [...featuredPrompts, ...prompts].find((p) => p.id === promptId);
+    const prompt = [...featuredPrompts, ...latestPromptsList, ...trendingPromptsList].find((p) => p.id === promptId);
     if (prompt) {
       await navigator.clipboard.writeText(prompt.content);
       await copyPrompt(promptId);
@@ -125,11 +132,11 @@ export default function Home() {
     sectionsRef.current[id] = el;
   };
 
-  const trendingPrompts = [...prompts]
+  const trendingPrompts = [...trendingPromptsList]
     .sort((a, b) => b.viewCount - a.viewCount)
     .slice(0, 5);
 
-  const latestPrompts = [...prompts]
+  const latestPrompts = [...latestPromptsList]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 6);
 
@@ -355,7 +362,7 @@ export default function Home() {
             </Link>
           </div>
 
-          {loading && prompts.length === 0 ? (
+          {loading && latestPromptsList.length === 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
                 <PromptCardSkeleton key={i} />
@@ -401,7 +408,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <div className="lg:col-span-3">
-              {loading && trendingPrompts.length === 0 ? (
+              {loading && trendingPromptsList.length === 0 ? (
                 <div className="space-y-4">
                   {[...Array(5)].map((_, i) => (
                     <div

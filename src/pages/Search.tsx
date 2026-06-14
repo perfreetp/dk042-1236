@@ -46,8 +46,12 @@ export default function Search() {
     return tagParam ? tagParam.split(',').map(Number).filter(Boolean) : [];
   }, [searchParams]);
 
-  const sortBy = searchParams.get('sort') || 'latest';
+  const sortBy = searchParams.get('sort') || 'createdAt';
   const currentPage = Number(searchParams.get('page')) || 1;
+  const purpose = searchParams.get('purpose') || undefined;
+  const model = searchParams.get('model') || undefined;
+  const language = searchParams.get('language') || undefined;
+  const difficulty = searchParams.get('difficulty') || undefined;
 
   const suggestions = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -77,7 +81,7 @@ export default function Search() {
     if (query.trim()) {
       performSearch();
     }
-  }, [query, selectedTags, sortBy, currentPage]);
+  }, [query, selectedTags, sortBy, currentPage, purpose, model, language, difficulty]);
 
   const fetchTags = async () => {
     setTagsLoading(true);
@@ -96,11 +100,16 @@ export default function Search() {
   const performSearch = async () => {
     const startTime = performance.now();
     const filters = {
-      search: query,
-      sort: sortBy === 'latest' ? 'createdAt' : sortBy === 'rating' ? 'rating' : sortBy === 'favorites' ? 'favoriteCount' : 'copyCount',
+      q: query,
+      sort: sortBy,
       page: currentPage,
       pageSize: 12,
       tags: selectedTags.length > 0 ? selectedTags : undefined,
+      purpose,
+      model,
+      language,
+      difficulty,
+      status: 'approved',
     };
     setFilters(filters);
     await fetchPrompts(filters);
@@ -207,7 +216,12 @@ export default function Search() {
     );
   };
 
-  const activeFilterCount = selectedTags.length;
+  const activeFilterCount =
+    selectedTags.length +
+    (purpose ? 1 : 0) +
+    (model ? 1 : 0) +
+    (language ? 1 : 0) +
+    (difficulty ? 1 : 0);
 
   return (
     <div className="min-h-screen bg-cream-100 pt-8 pb-16">

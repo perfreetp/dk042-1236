@@ -55,6 +55,7 @@ export const PromptService = {
     return PromptRepository.update(promptId, {
       ...data,
       version: newVersion,
+      status: 'pending',
       changelog: data.changelog || ''
     }).then(p => p!)
   },
@@ -93,7 +94,7 @@ export const PromptService = {
     await PromptRepository.incrementForkCount(promptId)
 
     const newPrompt = await PromptRepository.create({
-      title: `${originalPrompt.title} (Fork)`,
+      title: `${originalPrompt.title} (派生)`,
       content: originalPrompt.content,
       description: originalPrompt.description,
       authorId: userId,
@@ -106,7 +107,7 @@ export const PromptService = {
       useCases: originalPrompt.useCases,
       tagIds: originalPrompt.tags.map(t => t.id),
       version: '1.0.0',
-      changelog: `Forked from prompt #${promptId}`
+      changelog: `从提示词 #${promptId} 派生`
     })
 
     return newPrompt

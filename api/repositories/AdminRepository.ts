@@ -1,6 +1,5 @@
 import db from '../db'
 import type { HomeConfig, Banner } from '../../shared/types'
-import PromptRepository from './PromptRepository'
 
 interface HomeConfigRow {
   id: number
@@ -27,10 +26,10 @@ export const AdminRepository = {
     return (result.changes as number) > 0
   },
 
-  async rejectPrompt(promptId: number): Promise<boolean> {
+  async rejectPrompt(promptId: number, reason?: string): Promise<boolean> {
     const result = db.runQuery(
-      "UPDATE prompts SET status = 'rejected' WHERE id = ?",
-      [promptId]
+      "UPDATE prompts SET status = 'rejected', reject_reason = ? WHERE id = ?",
+      [reason || null, promptId]
     )
     return (result.changes as number) > 0
   },
@@ -71,6 +70,84 @@ export const AdminRepository = {
     }
 
     return (await AdminRepository.getHomeConfig())!
+  },
+
+  async getPendingPromptsCount(): Promise<number> {
+    const result = db.getOne<{ count: number }>("SELECT COUNT(*) as count FROM prompts WHERE status = 'pending'")
+    return result?.count || 0
+  },
+
+  async getReportsCount(): Promise<number> {
+    const result = db.getOne<{ count: number }>("SELECT COUNT(*) as count FROM reports WHERE status = 'pending'")
+    return result?.count || 0
+  },
+
+  async getUsersCount(): Promise<number> {
+    const result = db.getOne<{ count: number }>('SELECT COUNT(*) as count FROM users')
+    return result?.count || 0
+  },
+
+  async getPromptsCount(): Promise<number> {
+    const result = db.getOne<{ count: number }>('SELECT COUNT(*) as count FROM prompts')
+    return result?.count || 0
+  },
+
+  async getBanners(): Promise<Banner[]> {
+    const config = await AdminRepository.getHomeConfig()
+    return config?.banners || []
+  },
+
+  async createBanner(banner: Omit<Banner, 'id'>): Promise<Banner> {
+    const config = await AdminRepository.getHomeConfig()
+    const banners = config?.banners || []
+    const newId = banners.length > 0 ? Math.max(...banners.map(b => b.id)) + 1 : 1
+    const newBanner: Banner = { ...banner, id: newId }
+    banners.push(newBanner)
+    await AdminRepository.updateHomeConfig({ banners })
+    return newBanner
+  },
+
+  async updateBanner(id: number, bannerData: Partial<Omit<Banner, 'id'>>): Promise<Banner | null> {
+    const config = await AdminRepository.getHomeConfig()
+    const banners = config?.banners || []
+    const index = banners.findIndex(b => b.id === id)
+    if (index === -1) return null
+    banners[index] = { ...banners[index], ...bannerData }
+    await AdminRepository.updateHomeConfig({ banners })
+    return banners[index]
+  },
+
+  async deleteBanner(id: number): Promise<boolean> {
+    const config = await AdminRepository.getHomeConfig()
+    const banners = config?.banners || []
+    const filtered = banners.filter(b => b.id !== id)
+    if (filtered.length === banners.length) return false
+    await AdminRepository.updateHomeConfig({ banners: filtered })
+    return true
+  },
+
+  async removePrompt(promptId: number): Promise<boolean> {
+    const result = db.runQuery(
+      "UPDATE prompts SET status = 'removed' WHERE id = ?",
+      [promptId]
+    )
+    return (result.changes as number) > 0
+  },
+
+  async updatePromptAdmin(promptId: number, data: { isFeatured?: boolean }): Promise<boolean> {
+    const fields: string[] = []
+    const params: (string | number | null)[] = []
+
+    if (data.isFeatured !== undefined) {
+      fields.push('is_featured = ?')
+      params.push(data.isFeatured ? 1 : 0)
+    }
+
+    if (fields.length === 0) return true
+
+    params.push(promptId)
+    const result = db.runQuery(`UPDATE prompts SET ${fields.join(', ')} WHERE id = ?`, params)
+    return (result.changes as number) > 0
   }
 }
 

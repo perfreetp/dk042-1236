@@ -15,10 +15,11 @@ interface FilterPanelProps {
 }
 
 const sortOptions = [
-  { value: 'latest', label: '最新发布' },
+  { value: 'createdAt', label: '最新发布' },
   { value: 'rating', label: '评分最高' },
-  { value: 'favorites', label: '最多收藏' },
-  { value: 'copies', label: '最多复制' },
+  { value: 'viewCount', label: '浏览最多' },
+  { value: 'copyCount', label: '复制最多' },
+  { value: 'favoriteCount', label: '收藏最多' },
 ];
 
 const filterCategories = [
@@ -56,7 +57,7 @@ export default function FilterPanel({
     return tags.filter((tag) => tag.category === category);
   };
 
-  const hasActiveFilters = selectedTags.length > 0 || sortBy !== 'latest';
+  const hasActiveFilters = selectedTags.length > 0 || sortBy !== 'createdAt';
 
   const FilterContent = () => (
     <div className="space-y-6">

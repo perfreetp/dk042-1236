@@ -14,10 +14,14 @@ interface PromptFilters {
   language?: string;
   difficulty?: string;
   search?: string;
+  q?: string;
   sort?: string;
   page?: number;
   pageSize?: number;
   tags?: number[];
+  status?: string;
+  authorId?: number;
+  isFeatured?: boolean;
 }
 
 interface PaginationState {
@@ -84,10 +88,14 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
       if (currentFilters.language) params.language = currentFilters.language;
       if (currentFilters.difficulty) params.difficulty = currentFilters.difficulty;
       if (currentFilters.search) params.search = currentFilters.search;
+      if (currentFilters.q) params.q = currentFilters.q;
       if (currentFilters.sort) params.sort = currentFilters.sort;
       if (currentFilters.page) params.page = currentFilters.page;
       if (currentFilters.pageSize) params.pageSize = currentFilters.pageSize;
       if (currentFilters.tags?.length) params.tags = currentFilters.tags.join(',');
+      if (currentFilters.status) params.status = currentFilters.status;
+      if (currentFilters.authorId) params.authorId = currentFilters.authorId;
+      if (currentFilters.isFeatured !== undefined) params.isFeatured = currentFilters.isFeatured;
 
       const response = await apiClient.get<PaginatedResponse<Prompt>>('/prompts', params);
 

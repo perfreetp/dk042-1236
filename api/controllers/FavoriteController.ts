@@ -15,6 +15,10 @@ const createGroupSchema = z.object({
   name: z.string().min(1, '分组名称不能为空').max(50, '分组名称最多 50 个字符')
 })
 
+const updateGroupSchema = z.object({
+  groupId: z.number().nullable()
+})
+
 const querySchema = z.object({
   groupId: z.coerce.number().optional()
 })
@@ -145,6 +149,76 @@ export const FavoriteController = {
         success: true,
         data: group,
         message: '分组创建成功'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async updateFavoriteGroup(
+    req: AuthRequest,
+    res: Response<ApiResponse<Favorite>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: '未授权访问'
+        })
+        return
+      }
+      const id = parseInt(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的收藏 ID'
+        })
+        return
+      }
+      const { groupId } = updateGroupSchema.parse(req.body)
+      const favorite = await FavoriteRepository.updateFavoriteGroup(id, req.user.id, groupId)
+      if (!favorite) {
+        throw new AppError('收藏不存在或无权限修改', 404)
+      }
+      res.json({
+        success: true,
+        data: favorite,
+        message: '移动成功'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  async deleteGroup(
+    req: AuthRequest,
+    res: Response<ApiResponse<null>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: '未授权访问'
+        })
+        return
+      }
+      const groupId = parseInt(req.params.id)
+      if (isNaN(groupId)) {
+        res.status(400).json({
+          success: false,
+          error: '无效的分组 ID'
+        })
+        return
+      }
+      const result = await FavoriteRepository.deleteGroup(groupId, req.user.id)
+      if (!result) {
+        throw new AppError('分组不存在或无权限删除', 404)
+      }
+      res.json({
+        success: true,
+        message: '分组删除成功'
       })
     } catch (error) {
       next(error)

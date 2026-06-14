@@ -140,6 +140,24 @@ export const FavoriteRepository = {
     `
     const row = db.getOne<FavoriteGroupRow & { prompt_count: number }>(sql, [id])
     return row ? mapFavoriteGroupRow(row) : null
+  },
+
+  async updateFavoriteGroup(favoriteId: number, userId: number, groupId: number | null): Promise<Favorite | null> {
+    const sql = 'UPDATE favorites SET group_id = ? WHERE id = ? AND user_id = ?'
+    const params: any[] = [groupId, favoriteId, userId]
+    const result = db.runQuery(sql, params)
+    if ((result.changes as number) === 0) {
+      return null
+    }
+    const selectSql = 'SELECT * FROM favorites WHERE id = ?'
+    const row = db.getOne<FavoriteRow>(selectSql, [favoriteId])
+    return row ? mapFavoriteRow(row) : null
+  },
+
+  async deleteGroup(groupId: number, userId: number): Promise<boolean> {
+    db.runQuery('UPDATE favorites SET group_id = NULL WHERE group_id = ? AND user_id = ?', [groupId, userId])
+    const result = db.runQuery('DELETE FROM favorite_groups WHERE id = ? AND user_id = ?', [groupId, userId])
+    return (result.changes as number) > 0
   }
 }
 
